@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# scan runs nmap scans against a target
+# Copyright (C) 2020 Lucas Henry
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+IP=$1
+echo
+# Fast nmap
+nmap $IP -oN $IP.fast.nmap | grep -A 100 PORT | sed '/^$/d' | grep -v "Nmap done"
+PORTS=$(cat $IP.fast.nmap | grep ^[0-9] | cut -d '/' -f 1 | tr '\n' ',' | sed s/,$//)
+echo
+# Detailed nmap scan of discovered ports
+nmap -A -p${PORTS} $IP -oN $IP.nmap
+nmap -A -p- $IP -oN $IP-all.nmap
