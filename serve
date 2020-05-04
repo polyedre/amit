@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Config file for the amit hacking wrapper
+# serve runs a small http server to upload files easily
 # Copyright (C) 2020 Lucas Henry
 
 # This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,5 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# Wordlist used in enumeration
-DIR_WORDLIST=/usr/share/wordlists/dirbuster/directory-list-1.0.txt
-
-# Directory were files are served
-SERVE_DIR=uploads
-
-# Package manager to use to install ressources
-# Supported: pacman
-PACKAGE_MANAGER=pacman
+source config.sh
+python3 -m http.server 8000 -d $SERVE_DIR

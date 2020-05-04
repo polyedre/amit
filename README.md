@@ -17,3 +17,9 @@ Amit is a set of script that make hacking easier and faster.
 ## Config
 
 Amit configuration is done using the `config.sh` file.
+
+## Installation
+
+We recommend to add this folder into your PATH :
+
+    export PATH=/path/to/this/directory/:$PATH

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# amit-install installs useful ressources
+# Copyright (C) 2020 Lucas Henry
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+source config.sh
+
+download () {
+    if [ ! -f $SERVE_DIR/$2 ]; then
+        echo "Dowloading $2"
+        wget $1 --quiet -o $SERVE_DIR/$2
+    else
+        echo "Found $2"
+    fi
+}
+
+# Install tools
+case $PACKAGE_MANAGER in
+    pacman)
+        gobuster >/dev/null       || sudo pacman -S gobuster
+        nmap --version >/dev/null || sudo pacman -S nmap
+        ;;
+    *)
+        echo "Package Manager not recognized"
+        ;;
+esac
+    
+# Install tools to upload
+download https://github.com/DominicBreuker/pspy/releases/download/v1.2.0/pspy32 pspy32
+download https://github.com/DominicBreuker/pspy/releases/download/v1.2.0/pspy64 pspy64
+download https://raw.githubusercontent.com/rebootuser/LinEnum/master/LinEnum.sh lineum
+download https://raw.githubusercontent.com/carlospolop/privilege-escalation-awesome-scripts-suite/master/linPEAS/linpeas.sh linpeas
