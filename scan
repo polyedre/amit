@@ -22,5 +22,6 @@ nmap $IP -oN $IP.fast.nmap | grep -A 100 PORT | sed '/^$/d' | grep -v "Nmap done
 PORTS=$(cat $IP.fast.nmap | grep ^[0-9] | cut -d '/' -f 1 | tr '\n' ',' | sed s/,$//)
 echo
 # Detailed nmap scan of discovered ports
-nmap -A -p${PORTS} $IP -oN $IP.nmap
+nmap -A -p${PORTS} $IP -oN $IP.nmap -oA $IP >/dev/null
+pyscan $IP.xml
 nmap -A -p- $IP -oN $IP-all.nmap

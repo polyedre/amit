@@ -1,0 +1,84 @@
+#!/usr/bin/env python
+# pyscan runs nmap scans against a target
+# Copyright (C) 2020 Lucas Henry
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+from bs4 import BeautifulSoup
+import sys
+
+BOLD = "\033[1m"
+RESET = "\033[0m"
+FAINT = "\033[2m"
+
+
+class NmapHost:
+    def __init__(self, ip, hostname, services=[]):
+        self.hostname = hostname
+        self.ip = ip
+        self.services = services
+
+    def add_service(self, service):
+        self.services.append(service)
+
+    def __str__(self):
+        text = f"{BOLD}{self.hostname} : {self.ip}{RESET}\n"
+        text += "\n".join([str(s) for s in self.services])
+        return text
+
+
+class NmapService:
+    def __init__(self, port, name, product, version):
+        self.port = port
+        self.name = name
+        self.product = product
+        self.version = version
+        self.scripts = []
+
+    def __str__(self):
+        text = (
+            f"{BOLD}{self.port:6}{self.name:15} {self.product} {self.version}{RESET}\n"
+        )
+        for script in self.scripts:
+            text += str(script)
+        return text
+
+
+class NmapScript:
+    def __init__(self, name, output):
+        self.name = name
+        self.output = output
+
+    def __str__(self):
+        return (
+            f"\t{self.name} {FAINT}{self.output}{RESET}".replace("\n", f"\n\t\t") + "\n"
+        )
+
+
+with open(sys.argv[1]) as f:
+    a = BeautifulSoup("".join(f.readlines()), features="lxml")
+    hosts = []
+    host = NmapHost(a.host.address["addr"], a.host.hostnames.hostname["name"])
+    for port in a.host.ports.children:
+        if port.name:
+            s = port.service
+            service = NmapService(
+                port.get("portid"), s.get("name"), s.get("product"), s.get("version")
+            )
+            for script in port.findAll("script"):
+                service.scripts.append(
+                    NmapScript(script.get("id"), script.get("output"))
+                )
+            host.add_service(service)
+    print(host)
