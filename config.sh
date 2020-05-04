@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Wordlist used in enumeration
-DIR_WORDLIST=/usr/share/wordlists/dirbuster/directory-list-1.0.txt
+DIR_WORDLIST=~/.ZAP/fuzzers/dirbuster/directory-list-1.0.txt
 
 # Directory were files are served
 SERVE_DIR=uploads
@@ -24,3 +24,9 @@ SERVE_DIR=uploads
 # Package manager to use to install ressources
 # Supported: pacman
 PACKAGE_MANAGER=pacman
+
+# Location of your installed amit directory
+AMIT_DIR=~/code/amit
+
+# Command to start a new terminal and run a command in it
+TERM_EXT_RUN="termite -e"

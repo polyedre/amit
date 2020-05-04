@@ -31,6 +31,7 @@ case $PACKAGE_MANAGER in
     pacman)
         gobuster >/dev/null       || sudo pacman -S gobuster
         nmap --version >/dev/null || sudo pacman -S nmap
+        nikto -Version >/dev/null || sudo pacman -S nikto
         ;;
     *)
         echo "Package Manager not recognized"

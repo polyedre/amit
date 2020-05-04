@@ -16,4 +16,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 source config.sh
-gobuster dir -u $1 -w $DIR_WORDLIST
+clear
+echo "Scan using nikto started"
+sudo nikto -h $1 -Tuning x > $1.nikto.txt &
+$TERM_EXT_RUN "tail -f $(pwd)/$1.nikto.txt" &
+
+echo "Scan using gobuster started"
+gobuster dir -u $1 -w $DIR_WORDLIST -b 301 > $1.gobuster.txt &
