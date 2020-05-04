@@ -22,6 +22,8 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 FAINT = "\033[2m"
 
+URLS_FILE = sys.argv[1].replace(".xml", ".urls")
+
 
 class NmapHost:
     def __init__(self, ip, hostname, services=[]):
@@ -56,14 +58,46 @@ class NmapService:
 
 
 class NmapScript:
-    def __init__(self, name, output):
+    def __init__(self, name, output, basename):
         self.name = name
         self.output = output
+        self.basename = basename
+        self.parse()
 
     def __str__(self):
         return (
             f"\t{self.name} {FAINT}{self.output}{RESET}".replace("\n", f"\n\t\t") + "\n"
         )
+
+    def parse(self):
+        if self.name == "http-title":
+            words = self.output.split(" ")
+            for w in words:
+                if "http" in w:
+                    add_url(w.strip())
+        elif self.name == "http-robots.txt":
+            words = self.output.split("\n")[1].split(" ")
+            for w in words:
+                add_domain(self.basename + w)
+        elif self.name == "ssl-cert":
+            subject = self.output.split("\n")[0].split("=")[1]
+            add_domain(subject)
+            subject_alternatives = self.output.split("\n")[1].split(", DNS:")
+            add_domain(subject_alternatives[0].split("DNS:")[1])  # First
+            for domain in subject_alternatives[1:]:
+                add_domain(domain)
+
+
+url_file = open(URLS_FILE, "a")
+
+
+def add_url(url):
+    url_file.write(url + "\n")
+
+
+def add_domain(domain):
+    url_file.write("https://" + domain + "\n")
+    url_file.write("http://" + domain + "\n")
 
 
 with open(sys.argv[1]) as f:
@@ -78,7 +112,13 @@ with open(sys.argv[1]) as f:
             )
             for script in port.findAll("script"):
                 service.scripts.append(
-                    NmapScript(script.get("id"), script.get("output"))
+                    NmapScript(
+                        script.get("id"),
+                        script.get("output"),
+                        basename=host.hostname + ":" + port.get("portid"),
+                    )
                 )
             host.add_service(service)
     print(host)
+
+url_file.close()
