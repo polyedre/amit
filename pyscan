@@ -83,7 +83,9 @@ class NmapScript:
             subject = self.output.split("\n")[0].split("=")[1]
             add_domain(subject)
             subject_alternatives = self.output.split("\n")[1].split(", DNS:")
-            add_domain(subject_alternatives[0].split("DNS:")[1])  # First
+            dnss = subject_alternatives[0].split("dns:")
+            if len(dnss) > 1:
+                add_domain(dnss[1])  # First
             for domain in subject_alternatives[1:]:
                 add_domain(domain)
 
@@ -103,7 +105,10 @@ def add_domain(domain):
 with open(sys.argv[1]) as f:
     a = BeautifulSoup("".join(f.readlines()), features="lxml")
     hosts = []
-    host = NmapHost(a.host.address["addr"], a.host.hostnames.hostname["name"])
+    hostname = (
+        a.host.hostnames.hostname.get("name") if a.host.hostnames.hostname else ""
+    )
+    host = NmapHost(a.host.address.get("addr"), hostname)
     for port in a.host.ports.children:
         if port.name:
             s = port.service
