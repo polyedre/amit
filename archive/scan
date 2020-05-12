@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# enum is a small script that run enum scripts against an url
+# scan runs nmap scans against a target
 # Copyright (C) 2020 Lucas Henry
 
 # This program is free software: you can redistribute it and/or modify
@@ -15,11 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-source config.sh
-clear
-echo "Scan using nikto started"
-sudo nikto -h $1 -Tuning x > $1.nikto.txt &
-$TERM_EXT_RUN "tail -f $(pwd)/$1.nikto.txt" &
-
-echo "Scan using gobuster started"
-gobuster dir -u $1 -w $DIR_WORDLIST -b 301 > $1.gobuster.txt &
+if [ ! -z $IP ]; then
+    IP=$AMIT_TARGET
+    NAME=$AMIT_TARGET_NAME
+else
+    IP=$1
+fi
+echo
+# Fast nmap
+nmap $IP -oN $NAME.fast.nmap | grep -A 100 PORT | sed '/^$/d' | grep -v "Nmap done"
+PORTS=$(cat $NAME.fast.nmap | grep ^[0-9] | cut -d '/' -f 1 | tr '\n' ',' | sed s/,$//)
+echo
+# Detailed nmap scan of discovered ports
+nmap -A -p${PORTS} $IP -oA $NAME >/dev/null
+pyscan $NAME.xml
+nmap -A -p- $IP -oN $NAME-all.nmap
