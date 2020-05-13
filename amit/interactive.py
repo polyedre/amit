@@ -3,10 +3,11 @@
 import cmd
 import threading
 import subprocess
-from .manager import Service
+from .manager import Service, ManagerEncoder
 from bs4 import BeautifulSoup
 import re
 import logging
+import json
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,8 +23,13 @@ class AmitShell(cmd.Cmd):
         super().__init__()
         self.manager = manager
 
-    def do_load(self, arg):
-        print("Not implemented")
+    def do_save(self, arg):
+        if not arg:
+            arg = "amit.json"
+        s = json.dumps(self.manager, cls=ManagerEncoder)
+        with open(arg, "w") as f:
+            f.write(s)
+        logging.info("Data saved at '%s'", arg)
 
     def do_enum(self, arg):
         """Enumerate domains and subdomains related to args"""
@@ -108,8 +114,9 @@ def fast_scan_ip(ip):
     logging.info("Starting fast scan for target %s", ip)
     output = execute(f"nmap {ip}").decode()
     ports = []
-    for line in output.split("\n")[5:-3]:
-        ports.append(line.split("/")[0])
+    for line in output.split("\n"):
+        if "tcp" in line:
+            ports.append(line.split("/")[0])
     return ports
 
 
@@ -167,3 +174,9 @@ def enum_hosts(domains, manager):
 def start_shell(manager):
     amit_shell = AmitShell(manager)
     amit_shell.cmdloop()
+
+
+def serialize(obj):
+    if isinstance(obj, set):
+        return list(obj)
+    return obj.__dict__

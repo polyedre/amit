@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+import json
+
+
+class DomainEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Domain):
+            return {o.name: [ip for ip in o.ips]}
+        return json.JSONEncoder.default(self, o)
+
 
 class Domain:
     def __init__(self, name, ips=set()):
@@ -14,6 +23,18 @@ class Domain:
 
     def __hash__(self):
         return hash(self.name)
+
+
+class MachineEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Machine):
+            return {
+                o.ip: {
+                    "services": [ServiceEncoder().default(s) for s in o.services],
+                    "domains": [d.name for d in o.domains],
+                }
+            }
+        return json.JSONEncoder.default(self, o)
 
 
 class Machine:
@@ -37,24 +58,52 @@ class Machine:
         return hash(self.ip)
 
 
+class ServiceEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Service):
+            return {
+                "port": o.port,
+                "name": o.name,
+                "product": o.product,
+                "version": o.version,
+                "infos": o.info,
+            }
+        return json.JSONEncoder.default(self, o)
+
+
 class Service:
     def __init__(self, port, name, product, version):
         self.port = port
         self.name = name
         self.product = product
         self.version = version
-        self.scripts = []
         self.info = dict()
 
     def __str__(self):
         return f"{self.port:6}{self.name:15} {self.product} {self.version}"
 
 
-class Manager:
+class ManagerEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Manager):
+            return {
+                "domains": [DomainEncoder().default(d) for d in o.domains],
+                "machines": [MachineEncoder().default(m) for m in o.machines],
+            }
+        else:
+            print("Not recognized : ", o, type(o))
+        return json.JSONEncoder.default(self, o)
+
+
+class Manager(json.JSONEncoder):
     def __init__(self):
+        super().__init__()
         self.jobs = []
         self.domains = set()
         self.machines = set()
+
+    def default(self, o):
+        return [o.domains, o.machines]
 
     def add_domain(self, name, ips=[]):
         domain = Domain(name, ips)
