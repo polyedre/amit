@@ -3,10 +3,12 @@
 import cmd
 import threading
 import subprocess
-from .manager import Domain, Machine, Service
+from .manager import Service
 from bs4 import BeautifulSoup
 import re
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
 re_ip = re.compile("\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}")
 
@@ -46,11 +48,21 @@ class AmitShell(cmd.Cmd):
         if not ips:
             print(f"No ip scanned")
         else:
-            t = threading.Thread(
-                domain=scan_ips, name="ip_scanner", args=[list(ips), self.manager]
-            )
-            t.start()
-            self.manager.jobs.append(t)
+            scan_ips(ips, self.manager)
+
+    def do_machine(self, arg):
+        machine = self.manager.get_machine_by_ip(arg)
+        if not machine:
+            print(f"ERROR: '{arg}' is not a machine")
+        else:
+            for service in machine.services:
+                print(service)
+                for info in service.info:
+                    print(
+                        "\t\t{}\n\t\t{}".format(
+                            info, "\n\t\t".join(service.info[info].split("\n"))
+                        )
+                    )
 
     def do_list(self, arg):
         if arg == "domains":
@@ -74,37 +86,57 @@ def execute(args):
     return subprocess.check_output(args.split(" "))
 
 
+def start_job(func, manager, args=None):
+    t = threading.Thread(target=func, name=f"{func.__name__}({args})", args=args)
+    t.start()
+    manager.jobs.append(t)
+
+
 def scan_ips(ips, manager):
-    output = execute("nmap {} -oX /tmp/nmap-scan.xml".format(" ".join(ips))).decode()
-    with open("/tmp/nmap-scan.xml") as f:
-        xml = BeautifulSoup("".join(f.readlines()), features="lxml")
-        for host in xml.findAll("host"):
-            ip = host.address.get("addr")
-            domains = []
-            for hostname in xml.findAll("hostname"):
-                name = hostname.get("name")
-                domain = manager.add_domain(name, [ip])
-                domains.append(domain)
-            services = []
-            for port in host.findAll("port"):
-                if port.name:
-                    s = port.service
-                    service = Service(
-                        port.get("portid"),
-                        s.get("name"),
-                        s.get("product"),
-                        s.get("version"),
-                    )
-                    # for script in port.findAll("script"):
-                    #     service.scripts.append(
-                    #         Script(
-                    #             script.get("id"),
-                    #             script.get("output"),
-                    #             basename=host.hostname + ":" + port.get("portid"),
-                    #         )
-                    #     )
-                    services.append(service)
-            manager.add_machine(ip, domains, services)
+    for ip in ips:
+        start_job(scan_ip, manager, [ip, manager])
+
+
+def fast_scan_ip(ip):
+    logging.info("Starting fast scan for target %s", ip)
+    output = execute(f"nmap {ip}").decode()
+    ports = []
+    for line in output.split("\n")[5:-3]:
+        ports.append(line.split("/")[0])
+    return ports
+
+
+def scan_ip(ip, manager):
+    ports = fast_scan_ip(ip)
+    if ports:
+        logging.info("Starting advanced scan for target %s with ports %s", ip, ports)
+        execute(
+            f"nmap -A -v -p{','.join(ports)} {ip} -oX /tmp/{ip}nmap-scan.xml"
+        ).decode()
+        with open(f"/tmp/{ip}nmap-scan.xml") as f:
+            xml = BeautifulSoup("".join(f.readlines()), features="lxml")
+            for host in xml.findAll("host"):
+                ip = host.address.get("addr")
+                domains = []
+                for hostname in xml.findAll("hostname"):
+                    name = hostname.get("name")
+                    domain = manager.add_domain(name, [ip])
+                    domains.append(domain)
+                services = []
+                for port in host.findAll("port"):
+                    if port.name:
+                        s = port.service
+                        service = Service(
+                            port.get("portid"),
+                            s.get("name"),
+                            s.get("product"),
+                            s.get("version"),
+                        )
+                        for script in port.findAll("script"):
+                            service.info[script.get("id")] = script.get("output")
+                        services.append(service)
+                manager.add_machine(ip, domains, services)
+    logging.info("Scan finished for target %s", ip)
 
 
 def enum_host(domains, manager):
@@ -117,7 +149,7 @@ def enum_host(domains, manager):
             while not re_ip.match(ip) and ip != "":
                 ip = execute(f"dig +short {ip}").decode().strip()
             domain = manager.add_domain(line, [ip])
-            machine = manager.add_machine(ip, [domain])
+            manager.add_machine(ip, [domain])
 
 
 def start_shell(manager):

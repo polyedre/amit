@@ -3,6 +3,8 @@
 Amit is an enumeration framework to help pentesters.
 All the scans are done in threads. And the results can be visualized using `list domains` and `list machines` commands.
 
+![Python application](https://github.com/polyedre/amit/workflows/Python%20application/badge.svg)
+
 ## Usage
 
 Example session

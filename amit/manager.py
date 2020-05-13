@@ -44,6 +44,7 @@ class Service:
         self.product = product
         self.version = version
         self.scripts = []
+        self.info = dict()
 
     def __str__(self):
         return f"{self.port:6}{self.name:15} {self.product} {self.version}"
@@ -103,3 +104,6 @@ class Manager:
         if machines:
             return machines[0]
         return None
+
+    def __str__(self):
+        return "Manager"
