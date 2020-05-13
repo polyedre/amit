@@ -9,43 +9,43 @@ class TestManager(TestCase):
         """At initilisation, everything should be empty."""
         m = Manager()
         self.assertTrue(len(m.jobs) == 0)
-        self.assertTrue(len(m.targets) == 0)
+        self.assertTrue(len(m.domains) == 0)
         self.assertTrue(len(m.machines) == 0)
 
-    def test_add_target(self):
-        """Target can be added properly."""
+    def test_add_domain(self):
+        """Domain can be added properly."""
         m = Manager()
-        m.add_target("domain1.com", ["12.12.12.12"])
-        self.assertTrue(len(m.targets) == 1)
-        self.assertTrue(Domain("domain1.com") in m.targets)
-        m.add_target("domain2.com", ["12.12.12.12"])
-        self.assertTrue(len(m.targets) == 2)
-        self.assertTrue(Domain("domain1.com") in m.targets)
-        self.assertTrue(Domain("domain2.com") in m.targets)
+        m.add_domain("domain1.com", ["12.12.12.12"])
+        self.assertTrue(len(m.domains) == 1)
+        self.assertTrue(Domain("domain1.com") in m.domains)
+        m.add_domain("domain2.com", ["12.12.12.12"])
+        self.assertTrue(len(m.domains) == 2)
+        self.assertTrue(Domain("domain1.com") in m.domains)
+        self.assertTrue(Domain("domain2.com") in m.domains)
 
-    def test_add_target_different_ip(self):
-        """When adding a target that is already in the database, ips must be
+    def test_add_domain_different_ip(self):
+        """When adding a domain that is already in the database, ips must be
         added."""
         m = Manager()
-        m.add_target("domain1.com", ["12.12.12.12"])
-        self.assertTrue(len(m.targets) == 1)
-        self.assertTrue(Domain("domain1.com") in m.targets)
-        m.add_target("domain1.com", ["12.12.12.13"])
-        self.assertTrue(len(m.targets) == 1)
-        self.assertTrue(Domain("domain1.com") in m.targets)
+        m.add_domain("domain1.com", ["12.12.12.12"])
+        self.assertTrue(len(m.domains) == 1)
+        self.assertTrue(Domain("domain1.com") in m.domains)
+        m.add_domain("domain1.com", ["12.12.12.13"])
+        self.assertTrue(len(m.domains) == 1)
+        self.assertTrue(Domain("domain1.com") in m.domains)
 
-        domain = m.get_target_by_name("domain1.com")
+        domain = m.get_domain_by_name("domain1.com")
         self.assertTrue(domain.ips == set(["12.12.12.12", "12.12.12.13"]))
 
-    def test_remove_target(self):
-        """Possible to remove a target."""
+    def test_remove_domain(self):
+        """Possible to remove a domain."""
         m = Manager()
-        m.add_target("domain1.com", ["12.12.12.12"])
-        self.assertTrue(len(m.targets) == 1)
-        self.assertTrue(Domain("domain1.com") in m.targets)
-        m.remove_target("domain1.com")
-        self.assertTrue(len(m.targets) == 0)
-        self.assertFalse(Domain("domain1.com") in m.targets)
+        m.add_domain("domain1.com", ["12.12.12.12"])
+        self.assertTrue(len(m.domains) == 1)
+        self.assertTrue(Domain("domain1.com") in m.domains)
+        m.remove_domain("domain1.com")
+        self.assertTrue(len(m.domains) == 0)
+        self.assertFalse(Domain("domain1.com") in m.domains)
 
     def test_add_machine(self):
         """Machine can be added properly."""

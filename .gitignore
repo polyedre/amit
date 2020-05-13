@@ -1,1 +1,6 @@
 uploads/*
+/archive/
+/build/
+/dist/
+*__pycache__*
+/amit.egg-info/

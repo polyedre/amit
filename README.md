@@ -1,7 +1,7 @@
 # Amit
 
 Amit is an enumeration framework to help pentesters.
-All the scans are done in threads. And the results can be visualized using `list targets` and `list machines` commands.
+All the scans are done in threads. And the results can be visualized using `list domains` and `list machines` commands.
 
 ## Usage
 
@@ -13,7 +13,7 @@ Welcome to the amit shell.   Type help or ? to list commands.
 
 > enum example.com
 > scan 192.168.1.8
-> list targets
+> list domains
 10588.example.com
 1270011721.example.com                             1270011721.example.com
 ajloy1.01.example.com

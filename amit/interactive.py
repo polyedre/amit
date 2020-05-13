@@ -24,14 +24,14 @@ class AmitShell(cmd.Cmd):
         print("Not implemented")
 
     def do_enum(self, arg):
-        domain_targets = []
-        for target in arg.split(" "):
-            domain_targets.append(target)
-        if domain_targets:
+        domain_domains = []
+        for domain in arg.split(" "):
+            domain_domains.append(domain)
+        if domain_domains:
             t = threading.Thread(
-                target=enum_host,
+                domain=enum_host,
                 name="enum_domain",
-                args=[domain_targets, self.manager],
+                args=[domain_domains, self.manager],
             )
             t.start()
             self.manager.jobs.append(t)
@@ -47,15 +47,15 @@ class AmitShell(cmd.Cmd):
             print(f"No ip scanned")
         else:
             t = threading.Thread(
-                target=scan_ips, name="ip_scanner", args=[list(ips), self.manager]
+                domain=scan_ips, name="ip_scanner", args=[list(ips), self.manager]
             )
             t.start()
             self.manager.jobs.append(t)
 
     def do_list(self, arg):
-        if arg == "targets":
-            for target in self.manager.targets:
-                print(target)
+        if arg == "domains":
+            for domain in self.manager.domains:
+                print(domain)
         if arg == "jobs":
             for job in self.manager.jobs:
                 print(f" - {job.name} {'RUNNING' if job.is_alive() else 'DONE'}")
@@ -83,7 +83,7 @@ def scan_ips(ips, manager):
             domains = []
             for hostname in xml.findAll("hostname"):
                 name = hostname.get("name")
-                domain = manager.add_target(name, [ip])
+                domain = manager.add_domain(name, [ip])
                 domains.append(domain)
             services = []
             for port in host.findAll("port"):
@@ -107,16 +107,16 @@ def scan_ips(ips, manager):
             manager.add_machine(ip, domains, services)
 
 
-def enum_host(targets, manager):
+def enum_host(domains, manager):
     output = execute(
-        "sublist3r -n {}".format(" ".join([f"-d {target}" for target in targets]))
+        "sublist3r -n {}".format(" ".join([f"-d {domain}" for domain in domains]))
     ).decode()
     for line in output.split("\n")[9:-1]:
         if line[:3] != "[-]":
             ip = line
             while not re_ip.match(ip) and ip != "":
                 ip = execute(f"dig +short {ip}").decode().strip()
-            domain = manager.add_target(line, [ip])
+            domain = manager.add_domain(line, [ip])
             machine = manager.add_machine(ip, [domain])
 
 
