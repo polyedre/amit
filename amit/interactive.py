@@ -26,19 +26,15 @@ class AmitShell(cmd.Cmd):
         print("Not implemented")
 
     def do_enum(self, arg):
+        """Enumerate domains and subdomains related to args"""
         domain_domains = []
         for domain in arg.split(" "):
             domain_domains.append(domain)
         if domain_domains:
-            t = threading.Thread(
-                domain=enum_host,
-                name="enum_domain",
-                args=[domain_domains, self.manager],
-            )
-            t.start()
-            self.manager.jobs.append(t)
+            enum_hosts(domain_domains, self.manager)
 
     def do_scan(self, arg):
+        """Scan a list of IPs using nmap"""
         ips = set()
         for ip in arg.split(" "):
             if not re_ip.match(ip):
@@ -51,6 +47,7 @@ class AmitShell(cmd.Cmd):
             scan_ips(ips, self.manager)
 
     def do_machine(self, arg):
+        """Display verbose information about a machine"""
         machine = self.manager.get_machine_by_ip(arg)
         if not machine:
             print(f"ERROR: '{arg}' is not a machine")
@@ -64,22 +61,32 @@ class AmitShell(cmd.Cmd):
                         )
                     )
 
-    def do_list(self, arg):
-        if arg == "domains":
-            for domain in self.manager.domains:
-                print(domain)
-        if arg == "jobs":
-            for job in self.manager.jobs:
-                print(f" - {job.name} {'RUNNING' if job.is_alive() else 'DONE'}")
-        if arg == "machines":
-            for machine in self.manager.machines:
-                print(machine)
+    def do_machines(self, arg):
+        """Display IPs and services detected"""
+        for machine in self.manager.machines:
+            print(machine)
+
+    def do_domains(self, arg):
+        """Display domains and IPs"""
+        for domain in self.manager.domains:
+            print(domain)
+
+    def do_jobs(self, arg):
+        """Display jobs and status"""
+        for job in self.manager.jobs:
+            print(f" - {job.name} {'RUNNING' if job.is_alive() else 'DONE'}")
 
     def do_exec(self, arg):
+        """Execute a python command. Useful for debug purposes"""
         try:
             print(exec(arg))
         except Exception as e:
             print(e)
+
+    def do_exit(self, arg):
+        """Exit the amit session"""
+        print("Bye !")
+        exit(0)
 
 
 def execute(args):
@@ -139,17 +146,22 @@ def scan_ip(ip, manager):
     logging.info("Scan finished for target %s", ip)
 
 
-def enum_host(domains, manager):
-    output = execute(
-        "sublist3r -n {}".format(" ".join([f"-d {domain}" for domain in domains]))
-    ).decode()
+def enum_host(domain, manager):
+    logging.info("Starting looking for domain related to %s", domain)
+    output = execute(f"sublist3r -n -d {domain}").decode()
     for line in output.split("\n")[9:-1]:
         if line[:3] != "[-]":
             ip = line
             while not re_ip.match(ip) and ip != "":
                 ip = execute(f"dig +short {ip}").decode().strip()
-            domain = manager.add_domain(line, [ip])
-            manager.add_machine(ip, [domain])
+            new_domain = manager.add_domain(line, [ip])
+            manager.add_machine(ip, [new_domain])
+    logging.info("Finished looking for domain related to %s", domain)
+
+
+def enum_hosts(domains, manager):
+    for domain in domains:
+        start_job(enum_host, manager, [domain, manager])
 
 
 def start_shell(manager):

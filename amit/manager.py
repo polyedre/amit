@@ -107,3 +107,6 @@ class Manager:
 
     def __str__(self):
         return "Manager"
+
+    def __repr__(self):
+        return "Manager"
