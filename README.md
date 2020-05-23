@@ -13,40 +13,52 @@ Example session
 $ amit
 Welcome to the amit shell.   Type help or ? to list commands.
 
-> enum example.com
-> scan 192.168.1.8
-> list domains
-10588.example.com
-1270011721.example.com                             1270011721.example.com
-ajloy1.01.example.com
-13.example.com
-113751.example.com
-boris.klimenko.01.example.com
-ilya2.androsov.029.example.com
-69.48.135.122.example.com                          69.48.135.122.example.com
-stas4.andrianov.14.example.com
-112621.example.com
-12165.example.com
-> list machines
+> enum domains example.com
+> enum hosts 192.168.1.8
+> jobs
+ - EnumDomain(example.com) RUNNING
+ - EnumHost(192.168.1.8) RUNNING
+```
+
+And when jobs are finished :
+
+```sh
+> jobs
+ - EnumDomain(example.com) DONE
+ - EnumHost(192.168.1.8) DONE
+> hosts -h
+usage: hosts [-h] [-d] [-s] [-S] [targets [targets ...]]
+
+Show hosts
+
+positional arguments:
+  targets
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d, --domains
+  -s, --services
+  -S, --services-verbose
+> hosts -d
 93.184.216.34
-69.48.135.127
-69.48.135.102
-69.48.135.125
+  domains
+    www.example.com
+    example.com
 192.168.1.8
-    14000 scotty-ft       None None
+  domains
+> hosts -s 192.168.1.8
+192.168.1.8
+  services
+    21    ftp             None, HP JetDirect ftpd None
+    23    telnet          None, HP JetDirect telnetd None
+    80    http            None, HP-ChaiSOE None, 1.0
+    280   http-mgmt       None, HP-ChaiSOE None, 1.0
     443   https           None None
     515   printer         None None
-    21    ftp             None None
-    631   ipp             None None
-    23    telnet          None None
-    7627  soap-http       None None
-    80    http            None None
+    631   ipp             None, HP-ChaiSOE None, 1.0
+    7627  soap-http       None, HP-ChaiSOE None, 1.0
     9100  jetdirect       None None
-    280   http-mgmt       None None
-> list jobs
- - enum_domain DONE
- - ip_scanner DONE
->
+    14000 scotty-ft       None None
 ```
 
 ## Installation

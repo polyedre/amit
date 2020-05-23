@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="amit",
-    version="0.3",
+    version="0.4",
     description="A pentest enumeration framework",
     long_description=long_description,
     long_description_content_type="text/markdown",
