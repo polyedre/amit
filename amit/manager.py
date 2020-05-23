@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import re
 
 
 class DomainEncoder(json.JSONEncoder):
@@ -25,9 +26,9 @@ class Domain:
         return hash(self.name)
 
 
-class MachineEncoder(json.JSONEncoder):
+class HostEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, Machine):
+        if isinstance(o, Host):
             return {
                 o.ip: {
                     "services": [ServiceEncoder().default(s) for s in o.services],
@@ -37,7 +38,7 @@ class MachineEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
-class Machine:
+class Host:
     def __init__(self, ip, domains=[], services=[]):
         self.ip = ip
         self.services = set(services)
@@ -53,6 +54,9 @@ class Machine:
         return "{:16} \n\t{}".format(
             self.ip, "\n\t".join([str(s) for s in self.services])
         )
+
+    def __repr__(self):
+        return self.ip
 
     def __hash__(self):
         return hash(self.ip)
@@ -88,7 +92,7 @@ class ManagerEncoder(json.JSONEncoder):
         if isinstance(o, Manager):
             return {
                 "domains": [DomainEncoder().default(d) for d in o.domains],
-                "machines": [MachineEncoder().default(m) for m in o.machines],
+                "hosts": [HostEncoder().default(m) for m in o.hosts],
             }
         else:
             print("Not recognized : ", o, type(o))
@@ -100,10 +104,10 @@ class Manager(json.JSONEncoder):
         super().__init__()
         self.jobs = []
         self.domains = set()
-        self.machines = set()
+        self.hosts = set()
 
     def default(self, o):
-        return [o.domains, o.machines]
+        return [o.domains, o.hosts]
 
     def add_domain(self, name, ips=[]):
         domain = Domain(name, ips)
@@ -121,26 +125,26 @@ class Manager(json.JSONEncoder):
         domain = Domain(name)
         return self.domains.remove(domain)
 
-    def add_machine(self, ip, domains=[], services=[]):
-        machine = Machine(ip, domains, services)
-        if machine in self.machines:
+    def add_host(self, ip, domains=[], services=[]):
+        host = Host(ip, domains, services)
+        if host in self.hosts:
             # Only add ips if required
-            mmachine = self.get_machine_by_ip(ip)
-            mmachine.domains = mmachine.domains.union(domains)
+            mhost = self.get_host_by_ip(ip)
+            mhost.domains = mhost.domains.union(domains)
             for service in services:
-                mmachine.services.update([service])
-            return mmachine
+                mhost.services.update([service])
+            return mhost
         else:
             # Add the domain
-            self.machines.add(machine)
-            return machine
+            self.hosts.add(host)
+            return host
 
-    def remove_machine(self, ip):
-        machine = Machine(ip)
-        if machine in self.machines:
-            self.machines.remove(machine)
+    def remove_host(self, ip):
+        host = Host(ip)
+        if host in self.hosts:
+            self.hosts.remove(host)
         else:
-            print("ERROR: remove_machine: machine {} not found".format(ip))
+            print("ERROR: remove_host: host {} not found".format(ip))
 
     def get_domain_by_name(self, name):
         domains = [d for d in self.domains if d.name == name]
@@ -148,10 +152,18 @@ class Manager(json.JSONEncoder):
             return domains[0]
         return None
 
-    def get_machine_by_ip(self, ip):
-        machines = [m for m in self.machines if m.ip == ip]
-        if machines:
-            return machines[0]
+    def hosts_from_targets(self, targets):
+        return [
+            h
+            for h in self.hosts
+            for target in targets
+            if h.ip == target or Domain(target) in h.domains
+        ]
+
+    def get_host_by_ip(self, ip):
+        hosts = [m for m in self.hosts if m.ip == ip]
+        if hosts:
+            return hosts[0]
         return None
 
     def __str__(self):
@@ -159,3 +171,6 @@ class Manager(json.JSONEncoder):
 
     def __repr__(self):
         return "Manager"
+
+
+re_ip = re.compile("\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}")

@@ -3,16 +3,13 @@
 import cmd
 import threading
 import subprocess
-from .manager import Service, ManagerEncoder
+from .manager import Service, ManagerEncoder, re_ip
 from bs4 import BeautifulSoup
-import re
 import logging
 import json
 import argparse
 
 logging.basicConfig(level=logging.INFO)
-
-re_ip = re.compile("\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}")
 
 
 class InteractiveArgumentParser(argparse.ArgumentParser):
@@ -21,20 +18,32 @@ class InteractiveArgumentParser(argparse.ArgumentParser):
         raise ValueError
 
 
+#
+# PARSERS
+#
+
+# enum
+
+enum_parser = InteractiveArgumentParser(prog="enum", description="Enumerate targets.")
+enum_subparser = enum_parser.add_subparsers(dest="subcommand")
+enum_domains_parser = enum_subparser.add_parser("domains")
+enum_domains_parser.add_argument("domains", type=str, nargs="+")
+
+enum_hosts_parser = enum_subparser.add_parser("hosts")
+enum_hosts_parser.add_argument("hosts", type=str, nargs="+")
+
+# hosts
+
+hosts_parser = InteractiveArgumentParser(prog="hosts", description="Show hosts")
+hosts_parser.add_argument("-d", "--domains", action="store_true")
+hosts_parser.add_argument("-s", "--services", action="store_true")
+hosts_parser.add_argument("targets", type=str, default=None, nargs="*")
+
+
 class AmitShell(cmd.Cmd):
     intro = "Welcome to the amit shell.   Type help or ? to list commands.\n"
     prompt = "> "
     data = None
-
-    enum_parser = InteractiveArgumentParser(
-        prog="enum", description="Enumerate targets."
-    )
-    enum_subparser = enum_parser.add_subparsers(dest="subcommand")
-    enum_domains_parser = enum_subparser.add_parser("domains")
-    enum_domains_parser.add_argument("domains", type=str, nargs="+")
-
-    enum_hosts_parser = enum_subparser.add_parser("hosts")
-    enum_hosts_parser.add_argument("hosts", type=str, nargs="+")
 
     def __init__(self, manager):
         super().__init__()
@@ -52,7 +61,7 @@ class AmitShell(cmd.Cmd):
         """Enumerate domains and subdomains related to args"""
         try:
             args = arg.split(" ")
-            enum = AmitShell.enum_parser.parse_args(args)
+            enum = enum_parser.parse_args(args)
             if enum.subcommand == "domains":
                 enum_domains(enum.domains, self.manager)
             elif enum.subcommand == "hosts":
@@ -62,13 +71,13 @@ class AmitShell(cmd.Cmd):
         except ValueError:
             pass
 
-    def do_machine(self, arg):
-        """Display verbose information about a machine"""
-        machine = self.manager.get_machine_by_ip(arg)
-        if not machine:
-            print(f"ERROR: '{arg}' is not a machine")
+    def do_host(self, arg):
+        """Display verbose information about a host"""
+        host = self.manager.get_host_by_ip(arg)
+        if not host:
+            print(f"ERROR: '{arg}' is not a host")
         else:
-            for service in machine.services:
+            for service in host.services:
                 print(service)
                 for info in service.info:
                     print(
@@ -77,10 +86,31 @@ class AmitShell(cmd.Cmd):
                         )
                     )
 
-    def do_machines(self, arg):
+    def do_hosts(self, arg):
         """Display IPs and services detected"""
-        for machine in self.manager.machines:
-            print(machine)
+        try:
+            args = arg.split(" ")
+            if "" in args:
+                args.remove("")
+            hosts_namespace = hosts_parser.parse_args(args)
+            targets = (
+                self.manager.hosts_from_targets(hosts_namespace.targets)
+                if hosts_namespace.targets
+                else self.manager.hosts
+            )
+
+            for host in targets:
+                print(host.ip)
+                if hosts_namespace.domains:
+                    print("\tdomains")
+                    for domain in host.domains:
+                        print(f"\t\t{domain.name}")
+                if hosts_namespace.services:
+                    print("\tservices")
+                    for service in host.services:
+                        print(f"\t\t{service}")
+        except ValueError:
+            pass
 
     def do_domains(self, arg):
         """Display domains and IPs"""
@@ -159,7 +189,7 @@ def enum_host(ip, manager):
                         for script in port.findAll("script"):
                             service.info[script.get("id")] = script.get("output")
                         services.append(service)
-                manager.add_machine(ip, domains, services)
+                manager.add_host(ip, domains, services)
     logging.info("Scan finished for target %s", ip)
 
 
@@ -171,8 +201,12 @@ def enum_domain(domain, manager):
             ip = line
             while not re_ip.match(ip) and ip != "":
                 ip = execute(f"dig +short {ip}").decode().strip()
-            new_domain = manager.add_domain(line, [ip])
-            manager.add_machine(ip, [new_domain])
+            ips = ip.split("\n")
+            if "" in ips:
+                ips.remove("")
+            new_domain = manager.add_domain(line, ips)
+            for ip in ips:
+                manager.add_host(ip, [new_domain])
     logging.info("Finished looking for domain related to %s", domain)
 
 
