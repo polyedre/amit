@@ -37,6 +37,7 @@ enum_hosts_parser.add_argument("hosts", type=str, nargs="+")
 hosts_parser = InteractiveArgumentParser(prog="hosts", description="Show hosts")
 hosts_parser.add_argument("-d", "--domains", action="store_true")
 hosts_parser.add_argument("-s", "--services", action="store_true")
+hosts_parser.add_argument("-S", "--services-verbose", action="store_true")
 hosts_parser.add_argument("targets", type=str, default=None, nargs="*")
 
 
@@ -81,13 +82,13 @@ class AmitShell(cmd.Cmd):
                 print(service)
                 for info in service.info:
                     print(
-                        "\t\t{}\n\t\t{}".format(
-                            info, "\n\t\t".join(service.info[info].split("\n"))
+                        "    {}\n    {}".format(
+                            info, "\n    ".join(service.info[info].split("\n"))
                         )
                     )
 
     def do_hosts(self, arg):
-        """Display IPs and services detected"""
+        """Display informations about hosts"""
         try:
             args = arg.split(" ")
             if "" in args:
@@ -102,13 +103,24 @@ class AmitShell(cmd.Cmd):
             for host in targets:
                 print(host.ip)
                 if hosts_namespace.domains:
-                    print("\tdomains")
+                    print("  domains")
                     for domain in host.domains:
-                        print(f"\t\t{domain.name}")
-                if hosts_namespace.services:
-                    print("\tservices")
-                    for service in host.services:
-                        print(f"\t\t{service}")
+                        print(f"    {domain.name}")
+                if hosts_namespace.services or hosts_namespace.services_verbose:
+                    print("  services")
+                    for service in sorted(
+                        list(host.services),
+                        key=lambda x: Service.__getattribute__(x, "port"),
+                    ):
+                        print(f"    {service}")
+                        if hosts_namespace.services_verbose:
+                            for key, value in service.info.items():
+                                print(f"      {key}:")
+                                print(
+                                    "        {}".format(
+                                        value.replace("\n", "\n        ")
+                                    )
+                                )
         except ValueError:
             pass
 
@@ -160,8 +172,15 @@ def fast_scan_ip(ip):
     return ports
 
 
-def enum_host(ip, manager):
-    ports = fast_scan_ip(ip)
+def enum_host(target, manager):
+    ports = fast_scan_ip(target)
+    ips, domain_names = analyse_target(target)
+    domains = []
+    for domain_name in domain_names:
+        domain = manager.add_domain(domain_name, ips)
+        domains.append(domain)
+    for ip in ips:
+        manager.add_host(ip, domains, [Service(port) for port in ports])
     if ports:
         logging.info("Starting advanced scan for target %s with ports %s", ip, ports)
         execute(
@@ -193,20 +212,40 @@ def enum_host(ip, manager):
     logging.info("Scan finished for target %s", ip)
 
 
+def analyse_target(target):
+    ips = []
+    domain_names = []
+
+    if re_ip.match(target):
+        ips.append(target)
+    else:
+        domain_names.append(target)
+
+    while True:
+        target = execute(f"dig +short {target}").decode().strip()
+        if not target:
+            break
+        if re_ip.match(target):
+            ips.append(target)
+            break
+        else:
+            domain_names.append(target)
+    return ips, domain_names
+
+
 def enum_domain(domain, manager):
     logging.info("Starting looking for domain related to %s", domain)
     output = execute(f"sublist3r -n -d {domain}").decode()
     for line in output.split("\n")[9:-1]:
         if line[:3] != "[-]":
-            ip = line
-            while not re_ip.match(ip) and ip != "":
-                ip = execute(f"dig +short {ip}").decode().strip()
-            ips = ip.split("\n")
-            if "" in ips:
-                ips.remove("")
-            new_domain = manager.add_domain(line, ips)
+            target = line
+            ips, domain_names = analyse_target(target)
+            domains = []
+            for domain_name in domain_names:
+                domain = manager.add_domain(domain_name, ips)
+                domains.append(domain)
             for ip in ips:
-                manager.add_host(ip, [new_domain])
+                manager.add_host(ip, domains)
     logging.info("Finished looking for domain related to %s", domain)
 
 

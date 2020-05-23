@@ -75,16 +75,43 @@ class ServiceEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
+unknown_products = ["", "None", " None", "None "]
+
+
 class Service:
-    def __init__(self, port, name, product, version):
-        self.port = port
+    def __init__(self, port, name="", product="", version=""):
+        self.port = int(port)
         self.name = name
         self.product = product
         self.version = version
         self.info = dict()
 
     def __str__(self):
-        return f"{self.port:6}{self.name:15} {self.product} {self.version}"
+        return f"{self.port:<6}{self.name:15} {self.product} {self.version}"
+
+    def __hash__(self):
+        return hash(self.port)
+
+    def merge(self, service):
+        # Version
+        if self.version != service.version:
+            if self.version == "None":
+                self.version = service.version
+            else:
+                self.version = f"{self.version}, {service.version}"
+
+        # Product
+        if self.product != service.product and service.product not in unknown_products:
+            if self.product in unknown_products:
+                self.product = service.product
+            else:
+                self.product = f"{self.product}, {service.product}"
+
+        # Info
+        self.info.update(service.info)
+
+    def __eq__(self, o):
+        return isinstance(o, Service) and self.port == o.port
 
 
 class ManagerEncoder(json.JSONEncoder):
@@ -131,8 +158,10 @@ class Manager(json.JSONEncoder):
             # Only add ips if required
             mhost = self.get_host_by_ip(ip)
             mhost.domains = mhost.domains.union(domains)
-            for service in services:
-                mhost.services.update([service])
+            for mservice in mhost.services:
+                for service in services:
+                    if service == mservice:
+                        mservice.merge(service)
             return mhost
         else:
             # Add the domain
