@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 import cmd
-import threading
-import subprocess
-from .manager import Service, ManagerEncoder, re_ip
-from bs4 import BeautifulSoup
+from .manager import Service, ManagerEncoder
+from .jobs import enum_hosts, enum_domains
 import logging
 import json
 import argparse
@@ -132,7 +130,7 @@ class AmitShell(cmd.Cmd):
     def do_jobs(self, arg):
         """Display jobs and status"""
         for job in self.manager.jobs:
-            print(f" - {job.name} {'RUNNING' if job.is_alive() else 'DONE'}")
+            print(f" - {job}")
 
     def do_exec(self, arg):
         """Execute a python command. Useful for debug purposes"""
@@ -146,112 +144,8 @@ class AmitShell(cmd.Cmd):
         print("Bye !")
         exit(0)
 
-
-def execute(args):
-    return subprocess.check_output(args.split(" "))
-
-
-def start_job(func, manager, args=None):
-    t = threading.Thread(target=func, name=f"{func.__name__}({args})", args=args)
-    t.start()
-    manager.jobs.append(t)
-
-
-def enum_hosts(ips, manager):
-    for ip in ips:
-        start_job(enum_host, manager, [ip, manager])
-
-
-def fast_scan_ip(ip):
-    logging.info("Starting fast scan for target %s", ip)
-    output = execute(f"nmap {ip}").decode()
-    ports = []
-    for line in output.split("\n"):
-        if "tcp" in line:
-            ports.append(line.split("/")[0])
-    return ports
-
-
-def enum_host(target, manager):
-    ports = fast_scan_ip(target)
-    ips, domain_names = analyse_target(target)
-    domains = []
-    for domain_name in domain_names:
-        domain = manager.add_domain(domain_name, ips)
-        domains.append(domain)
-    for ip in ips:
-        manager.add_host(ip, domains, [Service(port) for port in ports])
-    if ports:
-        logging.info("Starting advanced scan for target %s with ports %s", ip, ports)
-        execute(
-            f"nmap -A -v -p{','.join(ports)} {ip} -oX /tmp/{ip}nmap-scan.xml"
-        ).decode()
-        with open(f"/tmp/{ip}nmap-scan.xml") as f:
-            xml = BeautifulSoup("".join(f.readlines()), features="lxml")
-            for host in xml.findAll("host"):
-                ip = host.address.get("addr")
-                domains = []
-                for hostname in xml.findAll("hostname"):
-                    name = hostname.get("name")
-                    domain = manager.add_domain(name, [ip])
-                    domains.append(domain)
-                services = []
-                for port in host.findAll("port"):
-                    if port.name:
-                        s = port.service
-                        service = Service(
-                            port.get("portid"),
-                            s.get("name"),
-                            s.get("product"),
-                            s.get("version"),
-                        )
-                        for script in port.findAll("script"):
-                            service.info[script.get("id")] = script.get("output")
-                        services.append(service)
-                manager.add_host(ip, domains, services)
-    logging.info("Scan finished for target %s", ip)
-
-
-def analyse_target(target):
-    ips = []
-    domain_names = []
-
-    if re_ip.match(target):
-        ips.append(target)
-    else:
-        domain_names.append(target)
-
-    while True:
-        target = execute(f"dig +short {target}").decode().strip()
-        if not target:
-            break
-        if re_ip.match(target):
-            ips.append(target)
-            break
-        else:
-            domain_names.append(target)
-    return ips, domain_names
-
-
-def enum_domain(domain, manager):
-    logging.info("Starting looking for domain related to %s", domain)
-    output = execute(f"sublist3r -n -d {domain}").decode()
-    for line in output.split("\n")[9:-1]:
-        if line[:3] != "[-]":
-            target = line
-            ips, domain_names = analyse_target(target)
-            domains = []
-            for domain_name in domain_names:
-                domain = manager.add_domain(domain_name, ips)
-                domains.append(domain)
-            for ip in ips:
-                manager.add_host(ip, domains)
-    logging.info("Finished looking for domain related to %s", domain)
-
-
-def enum_domains(domains, manager):
-    for domain in domains:
-        start_job(enum_domain, manager, [domain, manager])
+    def completedefault(self, arg):
+        return list(self.manager.jobs)
 
 
 def start_shell(manager):

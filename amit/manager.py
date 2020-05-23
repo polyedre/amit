@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import json
-import re
 
 
 class DomainEncoder(json.JSONEncoder):
@@ -152,16 +151,23 @@ class Manager(json.JSONEncoder):
         domain = Domain(name)
         return self.domains.remove(domain)
 
+    def add_job(self, job):
+        self.jobs.append(job)
+
     def add_host(self, ip, domains=[], services=[]):
         host = Host(ip, domains, services)
         if host in self.hosts:
             # Only add ips if required
             mhost = self.get_host_by_ip(ip)
             mhost.domains = mhost.domains.union(domains)
-            for mservice in mhost.services:
-                for service in services:
-                    if service == mservice:
-                        mservice.merge(service)
+            for service in services:
+                host_services = list(mhost.services)
+                if service in host_services:
+                    mservice_index = host_services.index(service)
+                    mservice = host_services[mservice_index]
+                    mservice.merge(service)
+                else:
+                    mhost.services.add(service)
             return mhost
         else:
             # Add the domain
@@ -200,6 +206,3 @@ class Manager(json.JSONEncoder):
 
     def __repr__(self):
         return "Manager"
-
-
-re_ip = re.compile("\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}")
