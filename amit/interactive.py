@@ -8,16 +8,33 @@ from bs4 import BeautifulSoup
 import re
 import logging
 import json
+import argparse
 
 logging.basicConfig(level=logging.INFO)
 
 re_ip = re.compile("\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}")
 
 
+class InteractiveArgumentParser(argparse.ArgumentParser):
+    def exit(self, status=0, message=None):
+        print(message, end="")
+        raise ValueError
+
+
 class AmitShell(cmd.Cmd):
     intro = "Welcome to the amit shell.   Type help or ? to list commands.\n"
     prompt = "> "
     data = None
+
+    enum_parser = InteractiveArgumentParser(
+        prog="enum", description="Enumerate targets."
+    )
+    enum_subparser = enum_parser.add_subparsers(dest="subcommand")
+    enum_domains_parser = enum_subparser.add_parser("domains")
+    enum_domains_parser.add_argument("domains", type=str, nargs="+")
+
+    enum_hosts_parser = enum_subparser.add_parser("hosts")
+    enum_hosts_parser.add_argument("hosts", type=str, nargs="+")
 
     def __init__(self, manager):
         super().__init__()
@@ -33,24 +50,17 @@ class AmitShell(cmd.Cmd):
 
     def do_enum(self, arg):
         """Enumerate domains and subdomains related to args"""
-        domain_domains = []
-        for domain in arg.split(" "):
-            domain_domains.append(domain)
-        if domain_domains:
-            enum_hosts(domain_domains, self.manager)
-
-    def do_scan(self, arg):
-        """Scan a list of IPs using nmap"""
-        ips = set()
-        for ip in arg.split(" "):
-            if not re_ip.match(ip):
-                print(f"ERROR: {ip} is not a valid ip")
+        try:
+            args = arg.split(" ")
+            enum = AmitShell.enum_parser.parse_args(args)
+            if enum.subcommand == "domains":
+                enum_domains(enum.domains, self.manager)
+            elif enum.subcommand == "hosts":
+                enum_hosts(enum.hosts, self.manager)
             else:
-                ips.add(ip)
-        if not ips:
-            print(f"No ip scanned")
-        else:
-            scan_ips(ips, self.manager)
+                print(f"{enum}: no action taken")
+        except ValueError:
+            pass
 
     def do_machine(self, arg):
         """Display verbose information about a machine"""
@@ -105,9 +115,9 @@ def start_job(func, manager, args=None):
     manager.jobs.append(t)
 
 
-def scan_ips(ips, manager):
+def enum_hosts(ips, manager):
     for ip in ips:
-        start_job(scan_ip, manager, [ip, manager])
+        start_job(enum_host, manager, [ip, manager])
 
 
 def fast_scan_ip(ip):
@@ -120,7 +130,7 @@ def fast_scan_ip(ip):
     return ports
 
 
-def scan_ip(ip, manager):
+def enum_host(ip, manager):
     ports = fast_scan_ip(ip)
     if ports:
         logging.info("Starting advanced scan for target %s with ports %s", ip, ports)
@@ -153,7 +163,7 @@ def scan_ip(ip, manager):
     logging.info("Scan finished for target %s", ip)
 
 
-def enum_host(domain, manager):
+def enum_domain(domain, manager):
     logging.info("Starting looking for domain related to %s", domain)
     output = execute(f"sublist3r -n -d {domain}").decode()
     for line in output.split("\n")[9:-1]:
@@ -166,9 +176,9 @@ def enum_host(domain, manager):
     logging.info("Finished looking for domain related to %s", domain)
 
 
-def enum_hosts(domains, manager):
+def enum_domains(domains, manager):
     for domain in domains:
-        start_job(enum_host, manager, [domain, manager])
+        start_job(enum_domain, manager, [domain, manager])
 
 
 def start_shell(manager):
