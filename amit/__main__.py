@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 
 from .interactive import start_shell
-from .manager import Manager
+from .database import Base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
 
 
 def main():
-    manager = Manager()
-    start_shell(manager)
+    session = scoped_session(sessionmaker())
+    engine = create_engine("sqlite:///amit.sqlite")
+    session.configure(bind=engine)
+    Base.metadata.create_all(engine)
+    start_shell(session)

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 
 import cmd
-from .manager import Service, ManagerEncoder
-from .jobs import enum_hosts, enum_domains
+from .database import Service, Machine, Domain, Job
+from .jobs import enum_machines, enum_domains
 import logging
-import json
 import argparse
 
 logging.basicConfig(level=logging.INFO)
@@ -27,16 +26,18 @@ enum_subparser = enum_parser.add_subparsers(dest="subcommand")
 enum_domains_parser = enum_subparser.add_parser("domains")
 enum_domains_parser.add_argument("domains", type=str, nargs="+")
 
-enum_hosts_parser = enum_subparser.add_parser("hosts")
-enum_hosts_parser.add_argument("hosts", type=str, nargs="+")
+enum_machines_parser = enum_subparser.add_parser("machines")
+enum_machines_parser.add_argument("machines", type=str, nargs="+")
 
-# hosts
+# machines
 
-hosts_parser = InteractiveArgumentParser(prog="hosts", description="Show hosts")
-hosts_parser.add_argument("-d", "--domains", action="store_true")
-hosts_parser.add_argument("-s", "--services", action="store_true")
-hosts_parser.add_argument("-S", "--services-verbose", action="store_true")
-hosts_parser.add_argument("targets", type=str, default=None, nargs="*")
+machines_parser = InteractiveArgumentParser(
+    prog="machines", description="Show machines"
+)
+machines_parser.add_argument("-d", "--domains", action="store_true")
+machines_parser.add_argument("-s", "--services", action="store_true")
+machines_parser.add_argument("-S", "--services-verbose", action="store_true")
+machines_parser.add_argument("targets", type=str, default=None, nargs="*")
 
 
 class AmitShell(cmd.Cmd):
@@ -44,17 +45,9 @@ class AmitShell(cmd.Cmd):
     prompt = "> "
     data = None
 
-    def __init__(self, manager):
+    def __init__(self, session):
         super().__init__()
-        self.manager = manager
-
-    def do_save(self, arg):
-        if not arg:
-            arg = "amit.json"
-        s = json.dumps(self.manager, cls=ManagerEncoder)
-        with open(arg, "w") as f:
-            f.write(s)
-        logging.info("Data saved at '%s'", arg)
+        self.session = session
 
     def do_enum(self, arg):
         """Enumerate domains and subdomains related to args"""
@@ -62,75 +55,62 @@ class AmitShell(cmd.Cmd):
             args = arg.split(" ")
             enum = enum_parser.parse_args(args)
             if enum.subcommand == "domains":
-                enum_domains(enum.domains, self.manager)
-            elif enum.subcommand == "hosts":
-                enum_hosts(enum.hosts, self.manager)
+                enum_domains(enum.domains, self.session)
+            elif enum.subcommand == "machines":
+                enum_machines(enum.machines, self.session)
             else:
                 print(f"{enum}: no action taken")
         except ValueError:
             pass
 
-    def do_host(self, arg):
-        """Display verbose information about a host"""
-        host = self.manager.get_host_by_ip(arg)
-        if not host:
-            print(f"ERROR: '{arg}' is not a host")
-        else:
-            for service in host.services:
-                print(service)
-                for info in service.info:
-                    print(
-                        "    {}\n    {}".format(
-                            info, "\n    ".join(service.info[info].split("\n"))
-                        )
-                    )
-
-    def do_hosts(self, arg):
-        """Display informations about hosts"""
+    def do_machine(self, arg):
+        """Display informations about machines"""
+        s = self.session()
         try:
             args = arg.split(" ")
             if "" in args:
                 args.remove("")
-            hosts_namespace = hosts_parser.parse_args(args)
-            targets = (
-                self.manager.hosts_from_targets(hosts_namespace.targets)
-                if hosts_namespace.targets
-                else self.manager.hosts
-            )
+            machines_namespace = machines_parser.parse_args(args)
+            if machines_namespace.targets:
+                # FIXME: machine target filter
+                targets = (
+                    self.session.query(Machine)
+                    .filter(Machine.ip in machines_namespace.targets)
+                    .all()
+                )
+                print(targets)
+            else:
+                targets = self.session.query(Machine).all()
 
-            for host in targets:
-                print(host.ip)
-                if hosts_namespace.domains:
+            for machine in targets:
+                print(machine.ip)
+                if machines_namespace.domains:
                     print("  domains")
-                    for domain in host.domains:
+                    for domain in machine.domains:
                         print(f"    {domain.name}")
-                if hosts_namespace.services or hosts_namespace.services_verbose:
+                if machines_namespace.services or machines_namespace.services_verbose:
                     print("  services")
                     for service in sorted(
-                        list(host.services),
+                        list(machine.services),
                         key=lambda x: Service.__getattribute__(x, "port"),
                     ):
-                        print(f"    {service}")
-                        if hosts_namespace.services_verbose:
-                            for key, value in service.info.items():
-                                print(f"      {key}:")
-                                print(
-                                    "        {}".format(
-                                        value.replace("\n", "\n        ")
-                                    )
-                                )
+                        print(f"    {service.port}")
         except ValueError:
             pass
+        s.close()
+
+    def do_save(self, arg):
+        self.session.commit()
 
     def do_domains(self, arg):
         """Display domains and IPs"""
-        for domain in self.manager.domains:
-            print(domain)
+        for domain in self.session.query(Domain).all():
+            print(f"{domain.name:30.30s} {''.join([m.ip for m in domain.ips]):<30s}")
 
     def do_jobs(self, arg):
         """Display jobs and status"""
-        for job in self.manager.jobs:
-            print(f" - {job}")
+        for job in self.session.query(Job).all():
+            print(f" - {job.name} {job.status}")
 
     def do_exec(self, arg):
         """Execute a python command. Useful for debug purposes"""
@@ -145,11 +125,11 @@ class AmitShell(cmd.Cmd):
         exit(0)
 
     def completedefault(self, arg):
-        return list(self.manager.jobs)
+        return list(self.session.jobs)
 
 
-def start_shell(manager):
-    amit_shell = AmitShell(manager)
+def start_shell(session):
+    amit_shell = AmitShell(session)
     amit_shell.cmdloop()
 
 
