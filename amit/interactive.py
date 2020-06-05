@@ -19,17 +19,22 @@ class InteractiveArgumentParser(argparse.ArgumentParser):
 # PARSERS
 #
 
-# enum
+# ENUM
 
 enum_parser = InteractiveArgumentParser(prog="enum", description="Enumerate targets.")
 enum_subparser = enum_parser.add_subparsers(dest="subcommand")
+
+#      enum domains
+
 enum_domains_parser = enum_subparser.add_parser("domains")
 enum_domains_parser.add_argument("domains", type=str, nargs="+")
+
+#      enum website
 
 enum_machines_parser = enum_subparser.add_parser("machines")
 enum_machines_parser.add_argument("machines", type=str, nargs="+")
 
-# machines
+# MACHINES
 
 machines_parser = InteractiveArgumentParser(
     prog="machines", description="Show machines"
@@ -66,46 +71,49 @@ class AmitShell(cmd.Cmd):
     def do_machine(self, arg):
         """Display informations about machines"""
         s = self.session()
-        try:
-            args = arg.split(" ")
-            if "" in args:
-                args.remove("")
-            machines_namespace = machines_parser.parse_args(args)
-            if machines_namespace.targets:
-                # FIXME: machine target filter
-                targets = (
-                    self.session.query(Machine)
-                    .filter(Machine.ip in machines_namespace.targets)
-                    .all()
-                )
-                print(targets)
-            else:
-                targets = self.session.query(Machine).all()
+        args = arg.split(" ")
+        if "" in args:
+            args.remove("")
+        machines_namespace = machines_parser.parse_args(args)
+        if machines_namespace.targets:
+            # FIXME: machine target filter
+            targets = (
+                self.session.query(Machine)
+                .filter(Machine.ip in machines_namespace.targets)
+                .all()
+            )
+        else:
+            targets = self.session.query(Machine).all()
 
-            for machine in targets:
-                print(machine.ip)
-                if machines_namespace.domains:
-                    print("  domains")
-                    for domain in machine.domains:
-                        print(f"    {domain.name}")
-                if machines_namespace.services or machines_namespace.services_verbose:
-                    print("  services")
-                    for service in sorted(
-                        list(machine.services),
-                        key=lambda x: Service.__getattribute__(x, "port"),
-                    ):
-                        print(f"    {service.port}")
-        except ValueError:
-            pass
+        for machine in targets:
+            print(machine.ip)
+            if machines_namespace.domains:
+                print("  domains")
+                for domain in machine.domains:
+                    print(f"    {domain.name}")
+            if machines_namespace.services or machines_namespace.services_verbose:
+                print("  services")
+                services = s.query(Service).filter(Service.machine == machine)
+                for service in services:
+                    print(f"    {service.oneline()}")
+                    if machines_namespace.services_verbose:
+                        for serviceinfo in service.info:
+                            print(
+                                "    {}".format(
+                                    serviceinfo.desc().replace("\n", "\n      ")
+                                )
+                            )
         s.close()
 
     def do_save(self, arg):
         self.session.commit()
 
     def do_domains(self, arg):
-        """Display domains and IPs"""
+        """Display domains and Machines"""
         for domain in self.session.query(Domain).all():
-            print(f"{domain.name:30.30s} {''.join([m.ip for m in domain.ips]):<30s}")
+            print(
+                f"{domain.name:30.30s} {''.join([m.ip for m in domain.machines]):<30s}"
+            )
 
     def do_jobs(self, arg):
         """Display jobs and status"""

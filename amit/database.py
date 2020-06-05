@@ -28,7 +28,7 @@ class Domain(Base):
     __tablename__ = "domain"
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True)
-    ips = relationship("Machine", secondary="domain_machine_link")
+    machines = relationship("Machine", secondary="domain_machine_link")
 
     def __repr__(self):
         return f"{self.name}"
@@ -50,8 +50,79 @@ class Service(Base):
     machine_id = Column(Integer, ForeignKey("machine.id"))
     machine = relationship("Machine", backref=backref("services", uselist=True))
 
+    def oneline(self):
+        return f"{self.port:5d} {self.name:15.15s} {self.product if self.product else 'None':15.15s} {self.version if self.version else 'None'}"
+
     def __repr__(self):
         return f"Service(port={self.port}, name={self.name}, product={self.product}) on {self.machine.ip}"
+
+
+class ServiceInfo(Base):
+    __tablename__ = "service_info"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    content = Column(String)
+    source = Column(String)
+    confidence = Column(Integer)
+    service_id = Column(Integer, ForeignKey("service.id"))
+    service = relationship("Service", backref=backref("info", uselist=True))
+
+    def desc(self):
+        return f"{self.name} (from source: {self.source})\n{self.content}"
+
+
+def add_machine(session, ip, domains=[]):
+    m = session.query(Machine).filter(Machine.ip == ip).first()
+    if m:
+        for d in domains:
+            if d not in m.domains:
+                m.domains.append(d)
+    else:
+        m = Machine(ip=ip, domains=domains)
+        session.add(m)
+    return m
+
+
+def add_domain(session, name, machines=[]):
+    d = session.query(Domain).filter(Domain.name == name).first()
+    if d:
+        for m in machines:
+            if m not in d.machines:
+                d.machines.append(m)
+    else:
+        session.add(Domain(name=name, machines=machines))
+
+
+def add_service(session, port, name, machine, product=None, version=None):
+    s = (
+        session.query(Service)
+        .join(Machine)
+        .filter(Machine.ip == machine.ip, Service.port == port)
+        .first()
+    )
+    if s:
+        if product:
+            s.product = product
+        if version:
+            s.version = version
+    else:
+        s = Service(
+            port=port, name=name, product=product, version=version, machine=machine
+        )
+        session.add(s)
+    return s
+
+
+def add_serviceinfo(session, name, content, service, source="Unknown", confidence=100):
+    s = ServiceInfo(
+        name=name,
+        content=content,
+        source=source,
+        confidence=confidence,
+        service=service,
+    )
+    session.add(s)
+    return s
 
 
 if __name__ == "__main__":

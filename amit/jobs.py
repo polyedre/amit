@@ -2,85 +2,76 @@
 
 from threading import Thread
 import re
-from .database import Service, Machine, Domain, Job
+from .database import (
+    Machine,
+    Domain,
+    Job,
+    add_machine,
+    add_domain,
+    add_service,
+    add_serviceinfo,
+)
 from bs4 import BeautifulSoup
 import subprocess
 import logging
-import asyncio
+import itertools
 
 logging.basicConfig(level=logging.DEBUG)
-re_ip = re.compile("\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}")
 
 
-# class NmapJob(ExecJob):
-#     def __init__(self, target, session, options=""):
-#         self.target = target
-#         self.session = session
-#         if options:
-#             command = f"nmap {options} {self.target} -oX /tmp/{self.target}-nmap.xml"
-#         else:
-#             command = f"nmap {self.target} -oX /tmp/{self.target}-nmap.xml"
-#         logging.debug(command)
-#         super().__init__(command=command)
-
-#     def parse(self, output):
-#         f = open(f"/tmp/{self.target}-nmap.xml")
-#         xml = BeautifulSoup("".join(f.readlines()), features="lxml")
-#         for machine in xml.findAll("machine"):
-#             ip = machine.address.get("addr")
-#             domains = []
-#             for machinename in xml.findAll("machinename"):
-#                 name = machinename.get("name")
-#                 domain = self.session.add_domain(name, [ip])
-#                 domains.append(domain)
-#             services = []
-#             for port in machine.findAll("port"):
-#                 if port.name:
-#                     s = port.service
-#                     service = Service(
-#                         port.get("portid"),
-#                         s.get("name"),
-#                         s.get("product"),
-#                         s.get("version"),
-#                     )
-#                     for script in port.findAll("script"):
-#                         service.info[script.get("id")] = script.get("output")
-#                     services.append(service)
-#             scanned_machine = self.session.add_machine(ip, domains, services)
-#         f.close()
-#         return scanned_machine
+def port_scan(target, session):
+    j = Job(name=f"port_scan({target})")
+    session.add(j)
+    session.commit()
+    analyse_target(target, session)
+    ports = nmap(target, session)
+    if ports:
+        nmap(target, session, options=f"-A -v -p{','.join([str(p) for p in ports])}")
+    else:
+        logging.warning("port_scan: no port found for target '%s'", target)
+    j.status = "DONE"
+    session.commit()
 
 
-# class EnumMachineJob(PotentiallyAsyncJob):
-#     def __init__(self, target, session):
-#         super().__init__(session, is_async=True)
-#         self.target = target
-#         self.name = f"EnumMachine({self.target})"
-
-#     def do(self):
-#         ips, domain_names = analyse_target(self.target, self.session)
-#         domains = []
-#         for domain_name in domain_names:
-#             domain = self.session.add_domain(domain_name, ips)
-#             domains.append(domain)
-#         for ip in ips:
-#             self.session.add_machine(ip, domains)
-
-#         machine = NmapJob(self.target, self.session).start()
-#         ports = [s.port for s in machine.services]
-#         if ports:
-#             logging.info(
-#                 "Starting advanced scan for target %s with ports %s", self.target, ports
-#             )
-#             NmapJob(
-#                 self.target,
-#                 self.session,
-#                 options=f"-A -v -p{','.join([str(p) for p in ports])}",
-#                 is_async=False,
-#                 register=False,
-#             ).start()
-
-#         self.finish()
+def nmap(target, session, options=""):
+    logging.debug("started nmap on target %s with options '%s'", target, options)
+    if options:
+        execute(f"nmap {options} {target} -oX /tmp/{target}-nmap.xml")
+    else:
+        execute(f"nmap {target} -oX /tmp/{target}-nmap.xml")
+    logging.debug("finished nmap on target %s with options '%s'", target, options)
+    ports = []
+    with open(f"/tmp/{target}-nmap.xml") as f:
+        xml = BeautifulSoup("".join(f.readlines()), features="lxml")
+        for machine in xml.findAll("host"):
+            ip = machine.address.get("addr")
+            m = add_machine(session, ip)
+            for hostname in xml.findAll("hostname"):
+                name = hostname.get("name")
+                add_domain(session, name, machines=[m])
+            for port in machine.findAll("port"):
+                if port.name:
+                    xml_s = port.service
+                    ports.append(port.get("portid"))
+                    s = add_service(
+                        session,
+                        port=port.get("portid"),
+                        name=xml_s.get("name"),
+                        machine=m,
+                        product=xml_s.get("product"),
+                        version=xml_s.get("version"),
+                    )
+                    for script in port.findAll("script"):
+                        add_serviceinfo(
+                            session,
+                            script.get("id"),
+                            script.get("output"),
+                            service=s,
+                            source="nmap",
+                            confidence=90,
+                        )
+    session.commit()
+    return ports
 
 
 def sublist3r(target, session):
@@ -91,7 +82,7 @@ def sublist3r(target, session):
 
     # Execution
     logging.debug("started sublist3r for target %s", target)
-    output = execute("sublist3r", "-n", "-d", target)
+    output = execute(f"sublist3r -n -d {target}")
     logging.debug("finished sublist3r for target %s", target)
 
     # Parsing
@@ -114,7 +105,7 @@ def analyse_target(target, session):
         domains.append(target)
 
         while True:
-            target = execute("dig", "+short", target).strip().split("\n")[0]
+            target = execute(f"dig +short {target}").strip().split("\n")[0]
             if not target:
                 for domain_name in domains:
                     d = (
@@ -156,18 +147,18 @@ def analyse_target(target, session):
     return m
 
 
-def execute(*args):
-    return subprocess.check_output(args).decode()
+def execute(command):
+    return subprocess.check_output(command.split(" ")).decode()
 
 
 def is_ip(target):
+    re_ip = re.compile("\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}")
     return re_ip.match(target)
 
 
 def enum_machines(targets, session):
     for target in targets:
-        pass
-        # EnumMachineJob(target, session).start()
+        Thread(target=port_scan, args=(target, session)).start()
 
 
 def enum_domains(targets, session):
