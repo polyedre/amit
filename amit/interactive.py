@@ -15,6 +15,11 @@ class InteractiveArgumentParser(argparse.ArgumentParser):
         raise ValueError
 
 
+GREEN = "\033[1;32m"
+RED = "\033[1;31m"
+FAINTED = "\033[2m"
+RESET = "\033[0;m"
+
 #
 # PARSERS
 #
@@ -86,7 +91,7 @@ class AmitShell(cmd.Cmd):
             targets = self.session.query(Machine).all()
 
         for machine in targets:
-            print(machine.ip)
+            print(f"{RED}{machine.ip}{RESET}")
             if machines_namespace.domains:
                 print("  domains")
                 for domain in machine.domains:
@@ -99,8 +104,10 @@ class AmitShell(cmd.Cmd):
                     if machines_namespace.services_verbose:
                         for serviceinfo in service.info:
                             print(
-                                "    {}".format(
-                                    serviceinfo.desc().replace("\n", "\n      ")
+                                "    {}{}{}".format(
+                                    FAINTED,
+                                    serviceinfo.desc().replace("\n", "\n      "),
+                                    RESET,
                                 )
                             )
         s.close()
