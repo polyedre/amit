@@ -13,7 +13,7 @@ from amit.database import (
     ServiceInfo,
 )
 from amit.database import Base
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, and_
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 
@@ -24,6 +24,9 @@ class TestManager(TestCase):
         session.configure(bind=engine)
         Base.metadata.create_all(engine, checkfirst=True)
         self.s = session()
+
+    def tearDown(self):
+        self.s.commit()
 
     def test_initialise(self):
         """At initilisation, everything should be empty."""
@@ -40,27 +43,29 @@ class TestManager(TestCase):
         d = add_domain(self.s, "domain1.com")
         res = self.s.query(Domain).filter(Domain.name == d.name).first()
         self.assertEqual(d.id, res.id)
+        self.s.commit()
 
         # Adding an already existing domain
         d = add_domain(self.s, "domain1.com")
         res = self.s.query(Domain).filter(Domain.name == d.name).all()
         self.assertEqual(len(res), 1)
         self.assertEqual(d.id, res[0].id)
+        self.s.commit()
 
         # Adding a domain with an ip
-        machine = Machine(ip="12.12.12.12")
+        machine = add_machine(self.s, "12.12.12.12")
         add_domain(self.s, "domain1.com", machines=[machine])
         res = self.s.query(Domain).filter(Domain.name == d.name).all()
         self.assertEqual(len(res), 1)
         self.assertEqual(d.id, res[0].id)
-        self.assertEqual(len(res[0].machines), 1)
+        self.assertTrue(machine in res[0].machines)
         self.assertEqual(res[0].machines[0].id, machine.id)
 
         res = self.s.query(Machine).filter(Machine.id == machine.id).first()
         self.assertEqual(res, machine)
 
         # Adding a domain with another ip
-        machine = Machine(ip="12.12.12.13")
+        machine = add_machine(self.s, "12.12.12.13")
         add_domain(self.s, "domain1.com", machines=[machine])
         res = self.s.query(Domain).filter(Domain.name == d.name).all()
         self.assertEqual(len(res), 1)
@@ -85,19 +90,19 @@ class TestManager(TestCase):
         self.assertEqual(d.id, res[0].id)
 
         # Adding a machine with a domain
-        domain = Domain(name="domain1.com")
+        domain = add_domain(self.s, "domain1.com")
         d = add_machine(self.s, "12.12.12.12", domains=[domain])
         res = self.s.query(Machine).filter(Machine.ip == d.ip).all()
         self.assertEqual(len(res), 1)
         self.assertEqual(d.id, res[0].id)
-        self.assertEqual(len(res[0].domains), 1)
+        self.assertTrue(domain in res[0].domains)
         self.assertEqual(res[0].domains[0].id, domain.id)
 
         res = self.s.query(Domain).filter(Domain.id == domain.id).first()
         self.assertEqual(res, domain)
 
         # Adding a machine with another domain
-        domain = Domain(name="domain2.com")
+        domain = add_domain(self.s, "domain2.com")
         d = add_machine(self.s, "12.12.12.12", domains=[domain])
         res = self.s.query(Machine).filter(Machine.ip == d.ip).all()
         self.assertEqual(len(res), 1)
@@ -106,3 +111,42 @@ class TestManager(TestCase):
 
         res = self.s.query(Domain).filter(Domain.id == domain.id).first()
         self.assertEqual(res, domain)
+
+    def test_add_service(self):
+        """Service can be added properly."""
+
+        # Adding a service
+        machine = add_machine(self.s, "12.12.12.12")
+        s = add_service(self.s, 80, "http", machine, product="apache", version="2.3.4")
+        res = (
+            self.s.query(Service)
+            .join(Machine)
+            .filter(Service.port == s.port, Machine.id == machine.id)
+            .first()
+        )
+        self.assertEqual(res.port, 80)
+        self.assertEqual(res.name, "http")
+
+        # Adding an already existing service
+        s = add_service(self.s, 80, "http", machine)
+        res = (
+            self.s.query(Service)
+            .join(Machine)
+            .filter(and_(Service.port == s.port, Machine.id == machine.id))
+            .all()
+        )
+        self.assertEqual(len(res), 1)
+        self.assertEqual(s.id, res[0].id)
+
+        # Adding an identical service with another machine
+        machine = add_machine(self.s, "12.12.12.13")
+        s2 = add_service(self.s, 80, "http", machine, product="apache", version="2.3.4")
+        res = (
+            self.s.query(Service)
+            .join(Machine)
+            .filter(Service.port == s2.port, Machine.id == machine.id)
+            .first()
+        )
+        self.assertEqual(res.port, 80)
+        self.assertEqual(res.name, "http")
+        self.assertNotEqual(s2.id, s.id)

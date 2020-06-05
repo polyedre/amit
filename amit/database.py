@@ -103,6 +103,7 @@ def add_service(session, port, name, machine, product=None, version=None):
         .first()
     )
     if s:
+        s.name = name
         if product:
             s.product = product
         if version:
