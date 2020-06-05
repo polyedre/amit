@@ -90,7 +90,9 @@ def add_domain(session, name, machines=[]):
             if m not in d.machines:
                 d.machines.append(m)
     else:
-        session.add(Domain(name=name, machines=machines))
+        d = Domain(name=name, machines=machines)
+        session.add(d)
+    return d
 
 
 def add_service(session, port, name, machine, product=None, version=None):
