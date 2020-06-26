@@ -30,9 +30,7 @@ class TestUserAndGroup(TestCase):
         self.assertEqual(u.id, res.id)
         self.s.commit()
 
-        u.email = "smorgan@MEGABANK.LOCAL"
-
-        u2 = add_user(self.s, name="Ray O'Leary", pseudo="roleary")
+        u2 = add_user(self.s, name="Ray O'Leary")
         res = self.s.query(User).filter(User.name == u2.name).first()
         self.assertEqual(u2.id, res.id)
         self.s.commit()
@@ -44,5 +42,5 @@ class TestUserAndGroup(TestCase):
         self.assertEqual(g.id, res.id)
         self.s.commit()
 
-        smorgan = User(name="Sally Morgan", pseudo="smorgan")
+        smorgan = User(name="Sally Morgan")
         g.users.append(smorgan)

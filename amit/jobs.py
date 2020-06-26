@@ -6,6 +6,11 @@ from .database import (
     Machine,
     Domain,
     Job,
+    User,
+    Group,
+    Note,
+    add_user,
+    add_group,
     add_machine,
     add_domain,
     add_service,
@@ -17,6 +22,83 @@ import logging
 import itertools
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+def ldap_scan(service, session):
+    base_dn = None  # Ldap base dn
+
+    j = Job(name=f"ldap_scan({service.machine.ip} on port {service.port})")
+    session.add(j)
+    session.commit()
+    res = execute(f"ldapsearch -x -h {service.machine.ip} -p {service.port} -s base")
+
+    lines = res.split("\n")
+    for line in lines:
+        if line.startswith("defaultNamingContext") or line.startswith(
+            "rootDomainNamingContext"
+        ):
+            base_dn = line.split(": ")[1]
+
+    if base_dn:
+        res = execute(
+            f"ldapsearch -x -h {service.machine.ip} -p {service.port} -b {base_dn}"
+        )
+        ldap_parse_users_and_groups(res, service, session)
+    else:
+        logging.info("could not retreive ldap base dn")
+
+
+def ldap_parse_users_and_groups(search_results, service, session):
+    for dn in search_results.split("\n\n"):
+        if ldap_is_user(dn):
+            ldap_parse_user(dn, service, session)
+        if ldap_is_group(dn):
+            ldap_parse_group(dn, service, session)
+
+
+def ldap_is_user(dn):
+    return "objectClass: user" in dn or "objectClass: person" in dn
+
+
+def ldap_is_group(dn):
+    return "objectClass: group" in dn
+
+
+def ldap_parse_user(dn, service, session):
+    name = None
+    notes = []
+    for line in dn.split("\n"):
+        if line.startswith("cn: "):
+            name = line.split(": ")[1]
+        if (
+            line.startswith("displayName")
+            or line.startswith("sAMAccountName: ")
+            or line.startswith("userPrincipalName: ")
+        ):
+            notes.append(Note(content=line))
+    u = add_user(session, name, service)
+    print(u)
+
+
+def ldap_parse_group(dn, service, session):
+    name = None
+    users = []
+    for line in dn.split("\n"):
+        if (
+            line.startswith("cn: ")
+            or line.startswith("displayName: ")
+            or line.startswith("name: ")
+        ):
+            name = line.split(": ")[1]
+        if line.startswith("member: "):
+            u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
+            users.append(u)
+    g = add_group(session, name, service, users)
+    print(g)
+
+
+def ldap_address_get_first(address):
+    return address.split(",")[0].split("=")[1]
 
 
 def port_scan(target, session):

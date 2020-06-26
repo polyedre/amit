@@ -75,19 +75,19 @@ class User(Base):
     __tablename__ = "user"
     id = Column(Integer, primary_key=True)
     name = Column(String)
-    pseudo = Column(String)
-    email = Column(String)
-    home_directory = Column(String)
 
     groups = relationship("Group", secondary="user_group_link")
 
-    machine_id = Column(Integer, ForeignKey("machine.id"))
-    machine = relationship("Machine", backref=backref("users", uselist=True))
+    service_id = Column(Integer, ForeignKey("service.id"))
+    service = relationship("Service", backref=backref("users", uselist=True))
 
     notes = relationship("Note", secondary="user_note_link")
 
     def __repr__(self):
-        return f"{self.id:4d}: User(name={self.name}, groups={self.groups})"
+        text = f"User(name={self.name}"
+        if self.groups:
+            text += f", groups={[g.name for g in self.groups]}"
+        return text + ")"
 
 
 class Group(Base):
@@ -97,13 +97,16 @@ class Group(Base):
 
     users = relationship("User", secondary="user_group_link")
 
-    machine_id = Column(Integer, ForeignKey("machine.id"))
-    machine = relationship("Machine", backref=backref("groups", uselist=True))
+    service_id = Column(Integer, ForeignKey("service.id"))
+    service = relationship("Service", backref=backref("groups", uselist=True))
 
     notes = relationship("Note", secondary="group_note_link")
 
     def __repr__(self):
-        return f"{self.id:4s}: Group {self.name} on {self.machine.ip}"
+        text = f"Group(name={self.name}"
+        if self.users:
+            text += f", users={[u.name for u in self.users]}"
+        return text + ")"
 
 
 class Note(Base):
@@ -190,45 +193,57 @@ def add_serviceinfo(session, name, content, service, source="Unknown", confidenc
     return s
 
 
-def add_user(session, name, machine=None, pseudo=None, email=None):
-    if machine:
+def add_user(session, name, service=None, notes=[]):
+    if service:
         u = (
             session.query(User)
-            .join(machine)
-            .filter(User.name == name, Machine.ip == machine.ip)
+            .join(Service)
+            .join(Machine)
+            .filter(User.name == name, Machine.ip == service.machine.ip)
             .first()
         )
     else:
         u = session.query(User).filter(User.name == name).first()
     if u:
         u.name = name
-        if pseudo:
-            u.pseudo = pseudo
-        if email:
-            u.email = email
-        if machine:
-            u.machine = machine
+        if service:
+            u.service = service
+        for note in notes:
+            u.notes.append(note)
     else:
-        u = User(name=name, pseudo=pseudo, email=email, machine=machine)
+        u = User(name=name, service=service, notes=notes)
         session.add(u)
     return u
 
 
-def add_group(session, name, machine=None):
-    if machine:
+def add_group(session, name, service=None, users=[], notes=[]):
+    if service:
         g = (
             session.query(Group)
+            .join(Service)
             .join(Machine)
-            .filter(Machine.ip == machine.ip, Group.name == name)
+            .filter(
+                Service.port == service.port,
+                Machine.ip == service.machine.ip,
+                Group.name == name,
+            )
             .first()
         )
     else:
         g = session.query(Group).filter(Group.name == name).first()
-
     if g:
         g.name = name
+        if g.users:
+            ids = [u.id for u in g.users]
+            for u in users:
+                if u.id not in ids:
+                    g.users.append(u)
+        else:
+            g.users = users
+        for note in notes:
+            g.notes.append(note)
     else:
-        g = Group(name=name, machine=machine)
+        g = Group(name=name, service=service, users=[], notes=notes)
         session.add(g)
     return g
 
