@@ -48,7 +48,7 @@ def interactive_show(arg, session):
         "users": show_users,
         "groups": show_groups,
         "services": show_services,
-        "domain": show_domain,
+        "domains": show_domains,
     }
 
     for name, function in show_elements.items():
@@ -59,13 +59,17 @@ def interactive_show(arg, session):
 def show_machines(namespace, session):
     machines = session.query(Machine).all()
     for machine in machines:
-        print(machine)
+        print(
+            "{:4d} - {:<15} ({})".format(
+                machine.id, machine.ip, ", ".join([d.name for d in machine.domains])
+            )
+        )
 
 
 def show_jobs(namespace, session):
-    jobs = session.query(Job).all()
+    jobs = session.query(Job).filter(Job.status == "RUNNING").all()
     for job in jobs:
-        print(job)
+        print(f"{job.id:4d} - {job.name:30} {job.status}")
 
 
 def show_users(namespace, session):
@@ -83,10 +87,23 @@ def show_groups(namespace, session):
 def show_services(namespace, session):
     services = session.query(Service).all()
     for service in services:
-        print(service)
+        print(
+            "{:4d} - {:15} {:<4d} {:20} {:20} {:20}".format(
+                service.id,
+                service.machine.ip or "",
+                service.port or "",
+                service.name or "",
+                service.product or "",
+                service.version or "",
+            )
+        )
 
 
-def show_domain(namespace, session):
+def show_domains(namespace, session):
     domains = session.query(Domain).all()
     for domain in domains:
-        print(domain)
+        print(
+            "{:4d} - {:50} ({})".format(
+                domain.id, domain.name, ", ".join([m.ip for m in domain.machines])
+            )
+        )
