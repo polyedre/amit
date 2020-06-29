@@ -81,6 +81,16 @@ class AmitShell(cmd.Cmd):
     def completedefault(self, arg):
         return list(self.session.jobs)
 
+    def emptyline(self):
+        pass  # Override default behaviour
+
+    def postcmd(self, stop, line):
+        nb_process = len(
+            self.session().query(Job).filter(Job.status == "RUNNING").all()
+        )
+        self.prompt = f"{nb_process} ⌾ > "
+        return False  # Continue interaction
+
 
 def start_shell(session):
     amit_shell = AmitShell(session)
