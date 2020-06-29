@@ -38,7 +38,7 @@ class TestUserAndGroup(TestCase):
     def test_add_group(self):
         # Adding an already existing domain
         g = add_group(self.s, name="New York")
-        res = self.s.query(User).filter(Group.name == g.name).first()
+        res = self.s.query(Group).filter(Group.name == g.name).first()
         self.assertEqual(g.id, res.id)
         self.s.commit()
 
