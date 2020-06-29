@@ -5,6 +5,7 @@ from .database import Service, Machine, Domain, Job
 from .constants import GREEN, RED, FAINTED, RESET
 from .jobs import enum_machines, enum_domains
 from .interactive_show import interactive_show
+from .interactive_add import interactive_add
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -70,6 +71,14 @@ class AmitShell(cmd.Cmd):
             print(exec(arg))
         except Exception as e:
             print(e)
+
+    def do_add(self, arg):
+        s = self.session()
+        try:
+            interactive_add(arg, s)
+        except Exception as e:
+            print(e)
+        s.close()
 
     def do_exit(self, arg):
         """Exit the amit session"""
