@@ -3,8 +3,8 @@
 import cmd
 from .database import Service, Machine, Domain, Job
 from .constants import GREEN, RED, FAINTED, RESET
-from .jobs import enum_machines, enum_domains
 from .interactive_show import interactive_show
+from .interactive_scan import interactive_scan
 from .interactive_add import interactive_add
 import logging
 
@@ -42,27 +42,20 @@ class AmitShell(cmd.Cmd):
         super().__init__()
         self.session = session
 
-    # def do_enum(self, arg):
-    #     """Enumerate domains and subdomains related to args"""
-    #     try:
-    #         args = arg.split(" ")
-    #         enum = enum_parser.parse_args(args)
-    #         if enum.subcommand == "domains":
-    #             enum_domains(enum.domains, self.session)
-    #         elif enum.subcommand == "machines":
-    #             enum_machines(enum.machines, self.session)
-    #         else:
-    #             print(f"{enum}: no action taken")
-    #     except ValueError:
-    #         pass
+    def do_scan(self, arg):
+        """Enumerate domains and subdomains related to args"""
+        try:
+            interactive_scan(arg, self.session)
+        except Exception as e:
+            print(e)
 
     def do_show(self, arg):
         """Display informations about machines"""
         s = self.session()
         try:
             interactive_show(arg, s)
-        except Exception:
-            pass
+        except Exception as e:
+            print(e)
         s.close()
 
     def do_exec(self, arg):
