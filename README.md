@@ -9,56 +9,28 @@ All the scans are done in threads. And the results can be visualized using `list
 
 Example session
 
-```sh
+```
 $ amit
 Welcome to the amit shell.   Type help or ? to list commands.
 
-> enum domains example.com
-> enum hosts 192.168.1.8
-> jobs
- - EnumDomain(example.com) RUNNING
- - EnumHost(192.168.1.8) RUNNING
-```
-
-And when jobs are finished :
-
-```sh
-> jobs
- - EnumDomain(example.com) DONE
- - EnumHost(192.168.1.8) DONE
-> hosts -h
-usage: hosts [-h] [-d] [-s] [-S] [targets [targets ...]]
-
-Show hosts
-
-positional arguments:
-  targets
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -d, --domains
-  -s, --services
-  -S, --services-verbose
-> hosts -d
-93.184.216.34
-  domains
-    www.example.com
-    example.com
-192.168.1.8
-  domains
-> hosts -s 192.168.1.8
-192.168.1.8
-  services
-    21    ftp             None, HP JetDirect ftpd None
-    23    telnet          None, HP JetDirect telnetd None
-    80    http            None, HP-ChaiSOE None, 1.0
-    280   http-mgmt       None, HP-ChaiSOE None, 1.0
-    443   https           None None
-    515   printer         None None
-    631   ipp             None, HP-ChaiSOE None, 1.0
-    7627  soap-http       None, HP-ChaiSOE None, 1.0
-    9100  jetdirect       None None
-    14000 scotty-ft       None None
+> add example.com 9.9.9.9
+0 ⌾ > show machines
+   1 93.184.216.34   (example.com)
+   2 9.9.9.9         ()
+0 ⌾ > show domains
+   1 - example.com                                        (93.184.216.34)
+0 ⌾ > scan machines 1 2
+0 ⌾ > show jobs
+port_scan(93.184.216.34)       RUNNING
+port_scan(9.9.9.9)             RUNNING
+2 ⌾ > show services
+   1 - 93.184.216.34   80   http                 Edgecast CDN httpd
+   2 - 93.184.216.34   443  http                 Edgecast CDN httpd
+   3 - 93.184.216.34   1119 bnetgame
+   4 - 93.184.216.34   1935 rtmp
+   5 - 9.9.9.9         53   domain
+   6 - 9.9.9.9         443  https
+   7 - 9.9.9.9         8443 https-alt
 ```
 
 ## Installation
