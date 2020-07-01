@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-from .database import Service, Machine, Domain, Job, User, Group
+from .database import Service, Machine, Domain, Job, User, Group, Note
 from .constants import FAINTED, RESET
 
 
@@ -11,32 +11,17 @@ class InteractiveArgumentParser(argparse.ArgumentParser):
 
 
 show_parser = InteractiveArgumentParser(prog="show", description="Display elements")
-show_subparser = show_parser.add_subparsers(
-    title="elements", help="Type of elements to show", prog="element", dest="element"
+show_parser.add_argument(
+    "element", help="One of machines, jobs, users, groups, services, domains",
 )
 show_parser.add_argument(
-    "-v", "--verbose", action="store_true", dest="verbose", help="Activate verbose mode"
+    "-v",
+    "--verbose",
+    action="count",
+    default=0,
+    dest="verbose",
+    help="Activate verbose mode",
 )
-
-# Machines
-machines_parser = show_subparser.add_parser("machines")
-
-# Jobs
-jobs_parser = show_subparser.add_parser("jobs")
-
-# Users
-users_parser = show_subparser.add_parser("users")
-# users_parser.add_argument("-m", "--machine", type=str, nargs="+")
-
-# Groups
-groups_parser = show_subparser.add_parser("groups")
-# groups_parser.add_argument("-m", "--machine", type=str, nargs="+")
-
-# Services
-services_parser = show_subparser.add_parser("services")
-
-# Domains
-domain_parser = show_subparser.add_parser("domains")
 
 
 def interactive_show(arg, session):
@@ -84,6 +69,13 @@ def show_users(namespace, session):
                 user.id, user.name, ", ".join([g.name for g in user.groups])
             )
         )
+        notes = session.query(Note).filter(Note.interest <= namespace.verbose)
+        for note in notes:
+            print(
+                "{}\t{:4d} - {}{}".format(
+                    FAINTED, note.id, note.content.replace("\n", "\n\t       "), RESET,
+                )
+            )
 
 
 def show_groups(namespace, session):

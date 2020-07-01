@@ -70,6 +70,14 @@ def ldap_scan(service, session):
                     f"ldapsearch -x -h {service.machine.ip} -p {service.port} -b {base_dn}"
                 )
 
+                ServiceInfo(
+                    name="Searching the whole ldap domain",
+                    source="ldapsearch",
+                    content=res,
+                    confidence=100,
+                    service=service,
+                )
+
                 ldap_parse_users_and_groups(res, service, session)
             else:
                 logging.info("could not retreive ldap base dn")
@@ -96,7 +104,7 @@ def ldap_is_group(dn):
 
 def ldap_parse_user(dn, service, session):
     name = None
-    notes = []
+    notes = [Note(content=dn, interest=2)]
     for line in dn.split("\n"):
         if line.startswith("cn: "):
             name = line.split(": ")[1]
@@ -105,8 +113,8 @@ def ldap_parse_user(dn, service, session):
             or line.startswith("sAMAccountName: ")
             or line.startswith("userPrincipalName: ")
         ):
-            notes.append(Note(content=line))
-    add_user(session, name, service)
+            notes.append(Note(content=line, interest=1))
+    add_user(session, name, service, notes=notes)
 
 
 def ldap_parse_group(dn, service, session):
