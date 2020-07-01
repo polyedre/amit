@@ -9,6 +9,8 @@ from .database import (
     User,
     Group,
     Note,
+    Service,
+    ServiceInfo,
     add_user,
     add_group,
     add_machine,
@@ -19,42 +21,69 @@ from .database import (
 from bs4 import BeautifulSoup
 import subprocess
 import logging
-import itertools
 
-logging.basicConfig(level=logging.CRITICAL)
-# logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.CRITICAL)
+logging.basicConfig(level=logging.INFO)
+
+
+def service_scan(id, session):
+    s = session()
+    service = s.query(Service).filter(Service.id == id).first()
+    j = Job(name=f"service_scan({service.port}, {service.name}, {service.machine.ip})")
+    s.add(j)
+    s.commit()
+
+    # Run scans
+    ldap_scan(service, session)
+    j.status = "DONE"
+    s.commit()
 
 
 def ldap_scan(service, session):
-    base_dn = None  # Ldap base dn
 
-    j = Job(name=f"ldap_scan({service.machine.ip} on port {service.port})")
-    session.add(j)
-    session.commit()
-    res = execute(f"ldapsearch -x -h {service.machine.ip} -p {service.port} -s base")
+    if service.name == "ldap":
+        base_dn = None  # Ldap base dn
 
-    lines = res.split("\n")
-    for line in lines:
-        if line.startswith("defaultNamingContext") or line.startswith(
-            "rootDomainNamingContext"
-        ):
-            base_dn = line.split(": ")[1]
-
-    if base_dn:
         res = execute(
-            f"ldapsearch -x -h {service.machine.ip} -p {service.port} -b {base_dn}"
+            f"ldapsearch -x -h {service.machine.ip} -p {service.port} -s base"
         )
-        ldap_parse_users_and_groups(res, service, session)
+
+        ServiceInfo(
+            name="Detecting base ldap domain",
+            source="ldapsearch",
+            content=res,
+            confidence=100,
+            service=service,
+        )
+
+        if "ldap_sasl_bind" not in res:
+
+            lines = res.split("\n")
+            for line in lines:
+                if line.startswith("defaultNamingContext") or line.startswith(
+                    "rootDomainNamingContext"
+                ):
+                    base_dn = line.split(": ")[1]
+
+            if base_dn:
+                res = execute(
+                    f"ldapsearch -x -h {service.machine.ip} -p {service.port} -b {base_dn}"
+                )
+
+                ldap_parse_users_and_groups(res, service, session)
+            else:
+                logging.info("could not retreive ldap base dn")
     else:
-        logging.info("could not retreive ldap base dn")
+        logging.debug("service on {service.machine.ip}:{service.port} is not ldap")
 
 
 def ldap_parse_users_and_groups(search_results, service, session):
-    for dn in search_results.split("\n\n"):
-        if ldap_is_user(dn):
-            ldap_parse_user(dn, service, session)
-        if ldap_is_group(dn):
-            ldap_parse_group(dn, service, session)
+    for _ in range(2):  # We do the parsing 2 times to get right links
+        for dn in search_results.split("\n\n"):
+            if ldap_is_user(dn):
+                ldap_parse_user(dn, service, session)
+            if ldap_is_group(dn):
+                ldap_parse_group(dn, service, session)
 
 
 def ldap_is_user(dn):
@@ -77,8 +106,7 @@ def ldap_parse_user(dn, service, session):
             or line.startswith("userPrincipalName: ")
         ):
             notes.append(Note(content=line))
-    u = add_user(session, name, service)
-    print(u)
+    add_user(session, name, service)
 
 
 def ldap_parse_group(dn, service, session):
@@ -94,8 +122,7 @@ def ldap_parse_group(dn, service, session):
         if line.startswith("member: "):
             u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
             users.append(u)
-    g = add_group(session, name, service, users)
-    print(g)
+    add_group(session, name, service, users)
 
 
 def ldap_address_get_first(address):
@@ -108,11 +135,11 @@ def port_scan(id, session):
     j = Job(name=f"port_scan({machine.ip})")
     s.add(j)
     s.commit()
-    nmap(machine, s)
+    nmap(machine, s, options="-Pn")
 
     ports = [s.port for s in machine.services]
     if ports:
-        nmap(machine, s, options=f"-A -v -p{','.join([str(p) for p in ports])}")
+        nmap(machine, s, options=f"-Pn -A -v -p{','.join([str(p) for p in ports])}")
     else:
         logging.warning("port_scan: no port found for target '%s'", machine.ip)
     j.status = "DONE"
@@ -152,7 +179,7 @@ def nmap(machine, session, options=""):
                         add_serviceinfo(
                             session,
                             script.get("id"),
-                            script.get("output"),
+                            script.get("output").strip(),
                             service=s,
                             source="nmap",
                             confidence=90,
@@ -245,6 +272,11 @@ def scan_machines_job(machine_ids, session):
 def scan_domains_job(domains_ids, session):
     for id in domains_ids:
         Thread(target=sublist3r, args=(id, session)).start()
+
+
+def scan_service_job(services_ids, session):
+    for id in services_ids:
+        Thread(target=service_scan, args=(id, session)).start()
 
 
 # def enum_domain(domain, session):
