@@ -3,25 +3,19 @@
 import argparse
 from .database import Service, Machine, Domain, Job, User, Group, Note
 from .constants import FAINTED, RESET
+from docopt import docopt, DocoptExit
 
 
-class InteractiveArgumentParser(argparse.ArgumentParser):
-    def exit(self, status=0, message=None):
-        print(message, end="")
+SHOW_USAGE = """Show command
+Usage:
+  show (machines|jobs|users|groups|services|domains) [-v | -vv | -vvv] [-m <machine>]... [<id>]...
+  show (-h | --help)
 
 
-show_parser = InteractiveArgumentParser(prog="show", description="Display elements")
-show_parser.add_argument(
-    "element", help="One of machines, jobs, users, groups, services, domains",
-)
-show_parser.add_argument(
-    "-v",
-    "--verbose",
-    action="count",
-    default=0,
-    dest="verbose",
-    help="Activate verbose mode",
-)
+Options:
+  -h --help     Show this screen.
+  -m <machine>  Filter by machine
+"""
 
 
 def interactive_show(arg, session):
@@ -29,7 +23,10 @@ def interactive_show(arg, session):
     if "" in args:
         args.remove("")
 
-    show_namespace = show_parser.parse_args(args)
+    try:
+        arguments = docopt(SHOW_USAGE, argv=args)
+    except (DocoptExit, SystemExit):
+        return
 
     show_elements = {
         "machines": show_machines,
@@ -41,12 +38,19 @@ def interactive_show(arg, session):
     }
 
     for name, function in show_elements.items():
-        if show_namespace.element == name:
-            function(show_namespace, session)
+        if arguments[name]:
+            function(arguments, session)
 
 
-def show_machines(namespace, session):
-    machines = session.query(Machine).all()
+def show_machines(arguments, session):
+
+    if arguments["<id>"]:
+        machines = (
+            session.query(Machine).filter(Machine.id.in_(arguments["<id>"])).all()
+        )
+    else:
+        machines = session.query(Machine).all()
+
     for machine in machines:
         print(
             "{:4d} - {:<15} ({})".format(
@@ -55,21 +59,35 @@ def show_machines(namespace, session):
         )
 
 
-def show_jobs(namespace, session):
-    jobs = session.query(Job).filter(Job.status == "RUNNING").all()
+def show_jobs(arguments, session):
+
+    if arguments["<id>"]:
+        jobs = (
+            session.query(Job)
+            .filter(Job.id.in_(arguments["<id>"]), Job.status == "RUNNING")
+            .all()
+        )
+    else:
+        jobs = session.query(Job).filter(Job.status == "RUNNING").all()
+
     for job in jobs:
         print(f"{job.id:4d} - {job.name:30} {job.status}")
 
 
-def show_users(namespace, session):
-    users = session.query(User).all()
+def show_users(arguments, session):
+
+    if arguments["<id>"]:
+        users = session.query(User).filter(User.id.in_(arguments["<id>"])).all()
+    else:
+        users = session.query(User).all()
+
     for user in users:
         print(
             "{:4d} - {:20.20} ({})".format(
                 user.id, user.name, ", ".join([g.name for g in user.groups])
             )
         )
-        notes = session.query(Note).filter(Note.interest <= namespace.verbose)
+        notes = session.query(Note).filter(Note.interest <= arguments["-v"])
         for note in notes:
             print(
                 "{}\t{:4d} - {}{}".format(
@@ -78,8 +96,13 @@ def show_users(namespace, session):
             )
 
 
-def show_groups(namespace, session):
-    groups = session.query(Group).all()
+def show_groups(arguments, session):
+
+    if arguments["<id>"]:
+        groups = session.query(Group).filter(Group.id.in_(arguments["<id>"])).all()
+    else:
+        groups = session.query(Group).all()
+
     for group in groups:
         print(
             "{:4d} - {:20.20} ({})".format(
@@ -88,8 +111,15 @@ def show_groups(namespace, session):
         )
 
 
-def show_services(namespace, session):
-    services = session.query(Service).all()
+def show_services(arguments, session):
+
+    if arguments["<id>"]:
+        services = (
+            session.query(Service).filter(Service.id.in_(arguments["<id>"])).all()
+        )
+    else:
+        services = session.query(Service).all()
+
     for service in services:
         print(
             "{:4d} - {:15} {:<4d} {:18.18} {:18.18} {:18.18}".format(
@@ -101,7 +131,7 @@ def show_services(namespace, session):
                 service.version or "",
             )
         )
-        if namespace.verbose:
+        if arguments["-v"]:
             for service_info in service.info:
                 print(
                     "{}\t{}\n\t\t{}{}".format(
@@ -113,8 +143,13 @@ def show_services(namespace, session):
                 )
 
 
-def show_domains(namespace, session):
-    domains = session.query(Domain).all()
+def show_domains(arguments, session):
+
+    if arguments["<id>"]:
+        domains = session.query(Domain).filter(Domain.id.in_(arguments["<id>"])).all()
+    else:
+        domains = session.query(Domain).all()
+
     for domain in domains:
         print(
             "{:4d} - {:50} ({})".format(
