@@ -2,6 +2,7 @@
 
 import argparse
 from .database import Service, Machine, Domain, Job, User, Group
+from .constants import FAINTED, RESET
 
 
 class InteractiveArgumentParser(argparse.ArgumentParser):
@@ -12,6 +13,9 @@ class InteractiveArgumentParser(argparse.ArgumentParser):
 show_parser = InteractiveArgumentParser(prog="show", description="Display elements")
 show_subparser = show_parser.add_subparsers(
     title="elements", help="Type of elements to show", prog="element", dest="element"
+)
+show_parser.add_argument(
+    "-v", "--verbose", action="store_true", dest="verbose", help="Activate verbose mode"
 )
 
 # Machines
@@ -75,20 +79,28 @@ def show_jobs(namespace, session):
 def show_users(namespace, session):
     users = session.query(User).all()
     for user in users:
-        print(user)
+        print(
+            "{:4d} - {:20.20} ({})".format(
+                user.id, user.name, ", ".join([g.name for g in user.groups])
+            )
+        )
 
 
 def show_groups(namespace, session):
     groups = session.query(Group).all()
     for group in groups:
-        print(group)
+        print(
+            "{:4d} - {:20.20} ({})".format(
+                group.id, group.name, ", ".join([g.name for g in group.users])
+            )
+        )
 
 
 def show_services(namespace, session):
     services = session.query(Service).all()
     for service in services:
         print(
-            "{:4d} - {:15} {:<4d} {:20} {:20} {:20}".format(
+            "{:4d} - {:15} {:<4d} {:18.18} {:18.18} {:18.18}".format(
                 service.id,
                 service.machine.ip or "",
                 service.port or "",
@@ -97,6 +109,16 @@ def show_services(namespace, session):
                 service.version or "",
             )
         )
+        if namespace.verbose:
+            for service_info in service.info:
+                print(
+                    "{}\t{}\n\t\t{}{}".format(
+                        FAINTED,
+                        service_info.name,
+                        service_info.content.replace("\n", "\n\t\t"),
+                        RESET,
+                    )
+                )
 
 
 def show_domains(namespace, session):
