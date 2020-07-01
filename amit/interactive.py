@@ -11,28 +11,6 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 
-#
-# PARSERS
-#
-
-# ENUM
-
-# enum_parser = InteractiveArgumentParser(prog="enum", description="Enumerate targets.")
-# enum_subparser = enum_parser.add_subparsers(dest="subcommand")
-
-# #      enum domains
-
-# enum_domains_parser = enum_subparser.add_parser("domains")
-# enum_domains_parser.add_argument("domains", type=str, nargs="+")
-
-# #      enum website
-
-# enum_machines_parser = enum_subparser.add_parser("machines")
-# enum_machines_parser.add_argument("machines", type=str, nargs="+")
-
-# MACHINES
-
-
 class AmitShell(cmd.Cmd):
     intro = "Welcome to the amit shell.   Type help or ? to list commands.\n"
     prompt = "> "

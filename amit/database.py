@@ -113,6 +113,7 @@ class Note(Base):
     __tablename__ = "note"
     id = Column(Integer, primary_key=True)
     content = Column(String)
+    interest = Column(Integer)
 
     def __repr__(self):
         return self.content
