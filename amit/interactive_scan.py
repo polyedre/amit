@@ -2,7 +2,7 @@
 
 import argparse
 from .database import Service, Machine, Domain, Job, User, Group
-from .jobs import scan_machines_job, scan_domains_job
+from .jobs import scan_machines_job, scan_domains_job, scan_service_job
 
 
 class InteractiveArgumentParser(argparse.ArgumentParser):
@@ -35,7 +35,7 @@ def interactive_scan(arg, session):
     scan_elements = {
         "machines": scan_machines,
         "domains": scan_domains,
-        "service": scan_services,
+        "services": scan_services,
     }
 
     for name, function in scan_elements.items():
@@ -48,7 +48,7 @@ def scan_machines(namespace, session):
 
 
 def scan_services(namespace, session):
-    print("Not implemented")
+    scan_service_job(namespace.ids, session)
 
 
 def scan_domains(namespace, session):
