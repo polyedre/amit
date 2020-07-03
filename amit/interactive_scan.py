@@ -1,28 +1,17 @@
 #!/usr/bin/env python3
 
-import argparse
-from .database import Service, Machine, Domain, Job, User, Group
 from .jobs import scan_machines_job, scan_domains_job, scan_service_job
+from docopt import docopt, DocoptExit
+
+SCAN_USAGE = """Scan command
+Usage:
+  scan (machines|jobs|users|groups|services|domains) [-v | -vv | -vvv] [<id>]...
+  scan (-h | --help)
 
 
-class InteractiveArgumentParser(argparse.ArgumentParser):
-    def exit(self, status=0, message=None):
-        print(message, end="")
-
-
-scan_parser = InteractiveArgumentParser(prog="scan", description="Scan elements")
-scan_subparser = scan_parser.add_subparsers(
-    title="elements", help="Type of elements to scan", prog="element", dest="element"
-)
-
-machine_parser = scan_subparser.add_parser("machines", help="scan ports in machines")
-machine_parser.add_argument("ids", type=int, nargs="+")
-
-domain_parser = scan_subparser.add_parser("domains", help="scan domain for subdomains")
-domain_parser.add_argument("ids", type=int, nargs="+")
-
-service_parser = scan_subparser.add_parser("services", help="scan services")
-service_parser.add_argument("ids", type=int, nargs="+")
+Options:
+  -h --help     Scan this screen.
+"""
 
 
 def interactive_scan(arg, session):
@@ -30,7 +19,14 @@ def interactive_scan(arg, session):
     if "" in args:
         args.remove("")
 
-    scan_namespace = scan_parser.parse_args(args)
+    try:
+        arguments = docopt(SCAN_USAGE, argv=args)
+    except (DocoptExit, SystemExit):
+        return
+    except BaseException as e:
+        print(e.__class__)
+
+    print(arguments)
 
     scan_elements = {
         "machines": scan_machines,
@@ -39,17 +35,17 @@ def interactive_scan(arg, session):
     }
 
     for name, function in scan_elements.items():
-        if scan_namespace.element == name:
-            function(scan_namespace, session)
+        if arguments[name]:
+            function(arguments, session)
 
 
-def scan_machines(namespace, session):
-    scan_machines_job(namespace.ids, session)
+def scan_machines(arguments, session):
+    scan_machines_job(arguments["<id>"], session)
 
 
-def scan_services(namespace, session):
-    scan_service_job(namespace.ids, session)
+def scan_services(arguments, session):
+    scan_service_job(arguments["<id>"], session)
 
 
-def scan_domains(namespace, session):
-    scan_domains_job(namespace.ids, session)
+def scan_domains(arguments, session):
+    scan_domains_job(arguments["<id>"], session)
