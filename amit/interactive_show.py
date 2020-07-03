@@ -91,16 +91,13 @@ def show_machines(arguments, session):
 
 def show_jobs(arguments, session):
 
+    jobs = session.query(Job)
     if arguments["<id>"]:
-        jobs = (
-            session.query(Job)
-            .filter(Job.id.in_(arguments["<id>"]), Job.status == "RUNNING")
-            .all()
-        )
-    else:
-        jobs = session.query(Job).filter(Job.status == "RUNNING").all()
+        jobs = jobs.filter(Job.id.in_(arguments["<id>"]))
+    if arguments["-v"] == 0:
+        jobs = jobs.filter(Job.status == "RUNNING")
 
-    for job in jobs:
+    for job in jobs.all():
         print(f"{job.id:4d} - {job.name:30} {job.status}")
 
 
@@ -143,14 +140,15 @@ def show_groups(arguments, session):
 
 def show_services(arguments, session):
 
+    services = session.query(Service)
     if arguments["<id>"]:
-        services = (
-            session.query(Service).filter(Service.id.in_(arguments["<id>"])).all()
-        )
-    else:
-        services = session.query(Service).all()
+        services = services.filter(Service.id.in_(arguments["<id>"]))
+    if arguments["-v"] == 0:
+        services = services.filter(Service.status == "open")
+    if arguments["-m"]:
+        services = services.filter(Service.machine_id.in_(arguments["-m"]))
 
-    for service in services:
+    for service in services.all():
         print(
             "{:4d} - {:15} {:<4d} {:18.18} {:18.18} {:18.18}".format(
                 service.id,
@@ -161,7 +159,7 @@ def show_services(arguments, session):
                 service.version or "",
             )
         )
-        if arguments["-v"]:
+        if arguments["-v"] > 1:
             for service_info in service.info:
                 print(
                     "{}\t{}\n\t\t{}{}".format(
