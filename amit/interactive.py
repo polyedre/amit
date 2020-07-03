@@ -5,6 +5,7 @@ from .database import Service, Machine, Domain, Job
 from .constants import GREEN, RED, FAINTED, RESET
 from .interactive_show import interactive_show
 from .interactive_scan import interactive_scan
+from .interactive_enum import interactive_enum
 from .interactive_add import interactive_add
 import logging
 
@@ -35,6 +36,13 @@ class AmitShell(cmd.Cmd):
         except Exception as e:
             print(e)
         s.close()
+
+    def do_enum(self, arg):
+        """Display informations about machines"""
+        try:
+            interactive_enum(arg, self.session)
+        except Exception as e:
+            print(e)
 
     def do_exec(self, arg):
         """Execute a python command. Useful for debug purposes"""
