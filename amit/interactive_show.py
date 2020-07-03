@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import argparse
 from .database import Service, Machine, Domain, Job, User, Group, Note
 from .constants import FAINTED, RESET
 from docopt import docopt, DocoptExit
