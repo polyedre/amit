@@ -49,6 +49,7 @@ class Service(Base):
     version = Column(String)
     machine_id = Column(Integer, ForeignKey("machine.id"))
     machine = relationship("Machine", backref=backref("services", uselist=True))
+    status = Column(String)
 
     def oneline(self):
         return f"{self.port:5d} {self.name:15.15s} {self.product if self.product else 'None':15.15s} {self.version if self.version else 'None'}"
@@ -161,7 +162,7 @@ def add_domain(session, name, machines=[]):
     return d
 
 
-def add_service(session, port, name, machine, product=None, version=None):
+def add_service(session, port, name, machine, product=None, version=None, status=None):
     s = (
         session.query(Service)
         .join(Machine)
@@ -174,9 +175,16 @@ def add_service(session, port, name, machine, product=None, version=None):
             s.product = product
         if version:
             s.version = version
+        if status:
+            s.status = status
     else:
         s = Service(
-            port=port, name=name, product=product, version=version, machine=machine
+            port=port,
+            name=name,
+            product=product,
+            version=version,
+            machine=machine,
+            status=status,
         )
         session.add(s)
     return s

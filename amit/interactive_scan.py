@@ -26,8 +26,6 @@ def interactive_scan(arg, session):
     except BaseException as e:
         print(e.__class__)
 
-    print(arguments)
-
     scan_elements = {
         "machines": scan_machines,
         "domains": scan_domains,
