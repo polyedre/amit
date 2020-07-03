@@ -29,6 +29,7 @@ class Domain(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True)
     machines = relationship("Machine", secondary="domain_machine_link")
+    notes = relationship("Note", secondary="domain_note_link")
 
     def __repr__(self):
         return f"{self.name}"
@@ -113,8 +114,9 @@ class Group(Base):
 class Note(Base):
     __tablename__ = "note"
     id = Column(Integer, primary_key=True)
+    title = Column(String)
     content = Column(String)
-    interest = Column(Integer)
+    interest = Column(Integer, default="1")
 
     def __repr__(self):
         return self.content
@@ -124,6 +126,12 @@ class UserGroupLink(Base):
     __tablename__ = "user_group_link"
     user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
     group_id = Column(Integer, ForeignKey("group.id"), primary_key=True)
+
+
+class DomainNoteLink(Base):
+    __tablename__ = "domain_note_link"
+    domain_id = Column(Integer, ForeignKey("domain.id"), primary_key=True)
+    note_id = Column(Integer, ForeignKey("note.id"), primary_key=True)
 
 
 class UserNoteLink(Base):
