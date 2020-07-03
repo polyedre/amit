@@ -116,7 +116,7 @@ class Note(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String)
     content = Column(String)
-    interest = Column(Integer)
+    interest = Column(Integer, default="1")
 
     def __repr__(self):
         return self.content

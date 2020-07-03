@@ -35,8 +35,13 @@ def service_scan(id, session):
 
     # Run scans
     ldap_scan(service, session)
+    dns_scan(service, session)
     j.status = "DONE"
     s.commit()
+
+
+def dns_scan(services, session):
+    pass
 
 
 def ldap_scan(service, session):
@@ -220,6 +225,14 @@ def scan_domain(id, session):
             analyse_target(mailserver, session)
 
         domain.notes.append(Note(title="Mail servers", content=mailservers))
+
+    # TXT
+    txtentries = execute(f"dig {domain.name} TXT +short").strip()
+    if txtentries:
+        domain.notes.append(Note(title="Text entries", content=txtentries))
+
+    whois = execute(f"whois {domain.name}")
+    domain.notes.append(Note(title="Whois", content=whois, interest=2))
 
     s.commit()
 

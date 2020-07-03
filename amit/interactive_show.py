@@ -114,9 +114,7 @@ def show_users(arguments, session):
                 user.id, user.name, ", ".join([g.name for g in user.groups])
             )
         )
-        if arguments["-v"] >= 1:
-            notes = session.query(Note).filter(Note.interest <= arguments["-v"])
-            show_notes(notes)
+        show_notes(user.notes, arguments["-v"])
 
 
 def show_groups(arguments, session):
@@ -179,14 +177,14 @@ def show_domains(arguments, session):
                 domain.id, domain.name, ", ".join([m.ip for m in domain.machines])
             )
         )
-        if arguments["-v"] >= 1:
-            show_notes(domain.notes)
+        show_notes(domain.notes, arguments["-v"])
 
 
-def show_notes(notes):
+def show_notes(notes, verbosity):
     for note in notes:
-        print(
-            "    {}{}\n      {}{}".format(
-                FAINTED, note.title, note.content.replace("\n", "\n      "), RESET
+        if note.interest <= verbosity:
+            print(
+                "    {}{}\n      {}{}".format(
+                    FAINTED, note.title, note.content.replace("\n", "\n      "), RESET
+                )
             )
-        )
