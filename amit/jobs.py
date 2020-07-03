@@ -104,7 +104,7 @@ def ldap_is_group(dn):
 
 def ldap_parse_user(dn, service, session):
     name = None
-    notes = [Note(content=dn, interest=2)]
+    notes = [Note(title="Ldap Dump", content=dn, interest=2)]
     for line in dn.split("\n"):
         if line.startswith("cn: "):
             name = line.split(": ")[1]
@@ -113,7 +113,7 @@ def ldap_parse_user(dn, service, session):
             or line.startswith("sAMAccountName: ")
             or line.startswith("userPrincipalName: ")
         ):
-            notes.append(Note(content=line, interest=1))
+            notes.append(Note(title="Potential username", content=line, interest=1))
     add_user(session, name, service, notes=notes)
 
 
@@ -198,6 +198,47 @@ def nmap(machine, session, options=""):
     return ports
 
 
+def scan_domain(id, session):
+    s = session()
+    domain = s.query(Domain).filter(Domain.id == id).first()
+    j = Job(name=f"scan_domain({domain.name})")
+    s.add(j)
+    s.commit()
+
+    # Nameservers
+    nameservers = execute(f"dig {domain.name} NS +short").strip()
+    if nameservers:
+        for nameserver in nameservers.split("\n"):
+            analyse_target(nameserver, session)
+
+        domain.notes.append(Note(title="Nameservers", content=nameservers))
+
+    # Zone transfert
+    for nameserver in nameservers.split("\n"):
+        res = execute(f"dig axfr @{nameserver} {domain.name}")
+        if not "Transfer failed." in res:
+            domain.notes.append(Note(title="Zone transfer", content=res, interest=0))
+
+    # MX
+    mailservers = execute(f"dig {domain.name} MX +short").strip()
+    if mailservers:
+        for mailserver in mailservers.split("\n"):
+            analyse_target(mailserver, session)
+
+        domain.notes.append(Note(title="Mail servers", content=mailservers))
+
+    # TXT
+    txtentries = execute(f"dig {domain.name} TXT +short").strip()
+    if txtentries:
+        domain.notes.append(Note(title="Text entries", content=txtentries))
+
+    whois = execute(f"whois {domain.name}")
+    domain.notes.append(Note(title="Whois", content=whois, interest=2))
+
+    j.status = "DONE"
+    s.commit()
+
+
 def sublist3r(id, session):
     s = session()
     domain = s.query(Domain).filter(Domain.id == id).first()
@@ -226,7 +267,10 @@ def analyse_target(target, session):
             m = Machine(ip=target)
             session.add(m)
     else:
-        domains = [target]
+        if target[-1] == ".":
+            domains = [target[:-1]]
+        else:
+            domains = [target]
 
         while True:
             target = execute(f"dig +short {target}").strip().split("\n")[0]
@@ -260,7 +304,10 @@ def analyse_target(target, session):
                             m.domains.append(domain)
                 break
             else:
-                domains.append(target)
+                if target[-1] == ".":
+                    domains.append(target[:-1])
+                else:
+                    domains.append(target)
     session.commit()
     return m
 
@@ -279,9 +326,14 @@ def scan_machines_job(machine_ids, session):
         Thread(target=port_scan, args=(id, session)).start()
 
 
-def scan_domains_job(domains_ids, session):
+def enum_domains_job(domains_ids, session):
     for id in domains_ids:
         Thread(target=sublist3r, args=(id, session)).start()
+
+
+def scan_domains_job(domains_ids, session):
+    for id in domains_ids:
+        Thread(target=scan_domain, args=(id, session)).start()
 
 
 def scan_service_job(services_ids, session):
