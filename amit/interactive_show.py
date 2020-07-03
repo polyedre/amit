@@ -114,13 +114,9 @@ def show_users(arguments, session):
                 user.id, user.name, ", ".join([g.name for g in user.groups])
             )
         )
-        notes = session.query(Note).filter(Note.interest <= arguments["-v"])
-        for note in notes:
-            print(
-                "{}\t{:4d} - {}{}".format(
-                    FAINTED, note.id, note.content.replace("\n", "\n\t       "), RESET,
-                )
-            )
+        if arguments["-v"] >= 1:
+            notes = session.query(Note).filter(Note.interest <= arguments["-v"])
+            show_notes(notes)
 
 
 def show_groups(arguments, session):
@@ -173,14 +169,24 @@ def show_services(arguments, session):
 
 def show_domains(arguments, session):
 
+    domains = session.query(Domain)
     if arguments["<id>"]:
-        domains = session.query(Domain).filter(Domain.id.in_(arguments["<id>"])).all()
-    else:
-        domains = session.query(Domain).all()
+        domains = domains.filter(Domain.id.in_(arguments["<id>"]))
 
-    for domain in domains:
+    for domain in domains.all():
         print(
             "{:4d} - {:50} ({})".format(
                 domain.id, domain.name, ", ".join([m.ip for m in domain.machines])
+            )
+        )
+        if arguments["-v"] >= 1:
+            show_notes(domain.notes)
+
+
+def show_notes(notes):
+    for note in notes:
+        print(
+            "    {}{}\n      {}{}".format(
+                FAINTED, note.title, note.content.replace("\n", "\n      "), RESET
             )
         )
