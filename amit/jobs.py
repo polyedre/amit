@@ -35,13 +35,8 @@ def service_scan(id, session):
 
     # Run scans
     ldap_scan(service, session)
-    dns_scan(service, session)
     j.status = "DONE"
     s.commit()
-
-
-def dns_scan(services, session):
-    pass
 
 
 def ldap_scan(service, session):
@@ -218,6 +213,12 @@ def scan_domain(id, session):
 
         domain.notes.append(Note(title="Nameservers", content=nameservers))
 
+    # Zone transfert
+    for nameserver in nameservers.split("\n"):
+        res = execute(f"dig axfr @{nameserver} {domain.name}")
+        if not "Transfer failed." in res:
+            domain.notes.append(Note(title="Zone transfer", content=res, interest=0))
+
     # MX
     mailservers = execute(f"dig {domain.name} MX +short").strip()
     if mailservers:
@@ -234,6 +235,7 @@ def scan_domain(id, session):
     whois = execute(f"whois {domain.name}")
     domain.notes.append(Note(title="Whois", content=whois, interest=2))
 
+    j.status = "DONE"
     s.commit()
 
 
