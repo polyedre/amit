@@ -173,15 +173,17 @@ def nmap(machine, session, options=""):
                 add_domain(session, name, machines=[m])
             for port in xml_machine.findAll("port"):
                 if port.name:
-                    xml_s = port.service
+                    xml_service = port.service
+                    xml_state = port.state
                     ports.append(port.get("portid"))
                     s = add_service(
                         session,
                         port=port.get("portid"),
-                        name=xml_s.get("name"),
+                        name=xml_service.get("name"),
                         machine=m,
-                        product=xml_s.get("product"),
-                        version=xml_s.get("version"),
+                        product=xml_service.get("product"),
+                        version=xml_service.get("version"),
+                        status=xml_state.get("state"),
                     )
                     for script in port.findAll("script"):
                         add_serviceinfo(

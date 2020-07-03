@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 from .database import Service, Machine, Domain, Job, User, Group, Note
-from .constants import FAINTED, RESET
+from .constants import FAINTED, RESET, GREEN, RED
 from docopt import docopt, DocoptExit
 
 
 SHOW_USAGE = """Show command
 Usage:
-  show (machines|jobs|users|groups|services|domains) [-v | -vv | -vvv] [-m <machine>]... [<id>]...
+  show [machines|jobs|users|groups|services|domains] [-v | -vv | -vvv] [-m <machine>]... [<id>]...
   show (-h | --help)
 
 
@@ -38,7 +38,38 @@ def interactive_show(arg, session):
 
     for name, function in show_elements.items():
         if arguments[name]:
-            function(arguments, session)
+            return function(arguments, session)
+
+    return show_default(arguments, session)
+
+
+def show_default(arguments, session):
+
+    machines = session.query(Machine)
+    if arguments["-m"]:
+        machines = machines.filter(Machine.id.in_(arguments["-m"]))
+
+    for machine in machines.all():
+        print("{}{:4d} - {:<15}{}".format(RED, machine.id, machine.ip, RESET))
+        if machine.domains:
+            print("     - DOMAINS:")
+            for domain in machine.domains:
+                print("\t{:4d} - {:<50}".format(domain.id, domain.name))
+        services = machine.services
+        if arguments["-v"] == 0:
+            services = [s for s in services if s.status == "open"]
+        if services:
+            print("     - SERVICES:")
+            for service in services:
+                print(
+                    "\t{:4d} - {:<4d} {:18.18} {:18.18} {:18.18}".format(
+                        service.id,
+                        service.port or "",
+                        service.name or "",
+                        service.product or "",
+                        service.version or "",
+                    )
+                )
 
 
 def show_machines(arguments, session):
