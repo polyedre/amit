@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 from .database import Service, Machine, Domain, Job, User, Group, Note
-from .constants import FAINTED, RESET
+from .constants import FAINTED, RESET, GREEN, RED
 from docopt import docopt, DocoptExit
 
 
 SHOW_USAGE = """Show command
 Usage:
-  show (machines|jobs|users|groups|services|domains) [-v | -vv | -vvv] [-m <machine>]... [<id>]...
+  show [machines|jobs|users|groups|services|domains] [-v | -vv | -vvv] [-m <machine>]... [<id>]...
   show (-h | --help)
 
 
@@ -38,7 +38,38 @@ def interactive_show(arg, session):
 
     for name, function in show_elements.items():
         if arguments[name]:
-            function(arguments, session)
+            return function(arguments, session)
+
+    return show_default(arguments, session)
+
+
+def show_default(arguments, session):
+
+    machines = session.query(Machine)
+    if arguments["-m"]:
+        machines = machines.filter(Machine.id.in_(arguments["-m"]))
+
+    for machine in machines.all():
+        print("{}{:4d} - {:<15}{}".format(RED, machine.id, machine.ip, RESET))
+        if machine.domains:
+            print("     - DOMAINS:")
+            for domain in machine.domains:
+                print("\t{:4d} - {:<50}".format(domain.id, domain.name))
+        services = machine.services
+        if arguments["-v"] == 0:
+            services = [s for s in services if s.status == "open"]
+        if services:
+            print("     - SERVICES:")
+            for service in services:
+                print(
+                    "\t{:4d} - {:<4d} {:18.18} {:18.18} {:18.18}".format(
+                        service.id,
+                        service.port or "",
+                        service.name or "",
+                        service.product or "",
+                        service.version or "",
+                    )
+                )
 
 
 def show_machines(arguments, session):
@@ -60,16 +91,13 @@ def show_machines(arguments, session):
 
 def show_jobs(arguments, session):
 
+    jobs = session.query(Job)
     if arguments["<id>"]:
-        jobs = (
-            session.query(Job)
-            .filter(Job.id.in_(arguments["<id>"]), Job.status == "RUNNING")
-            .all()
-        )
-    else:
-        jobs = session.query(Job).filter(Job.status == "RUNNING").all()
+        jobs = jobs.filter(Job.id.in_(arguments["<id>"]))
+    if arguments["-v"] == 0:
+        jobs = jobs.filter(Job.status == "RUNNING")
 
-    for job in jobs:
+    for job in jobs.all():
         print(f"{job.id:4d} - {job.name:30} {job.status}")
 
 
@@ -112,14 +140,15 @@ def show_groups(arguments, session):
 
 def show_services(arguments, session):
 
+    services = session.query(Service)
     if arguments["<id>"]:
-        services = (
-            session.query(Service).filter(Service.id.in_(arguments["<id>"])).all()
-        )
-    else:
-        services = session.query(Service).all()
+        services = services.filter(Service.id.in_(arguments["<id>"]))
+    if arguments["-v"] == 0:
+        services = services.filter(Service.status == "open")
+    if arguments["-m"]:
+        services = services.filter(Service.machine_id.in_(arguments["-m"]))
 
-    for service in services:
+    for service in services.all():
         print(
             "{:4d} - {:15} {:<4d} {:18.18} {:18.18} {:18.18}".format(
                 service.id,
@@ -130,7 +159,7 @@ def show_services(arguments, session):
                 service.version or "",
             )
         )
-        if arguments["-v"]:
+        if arguments["-v"] > 1:
             for service_info in service.info:
                 print(
                     "{}\t{}\n\t\t{}{}".format(
