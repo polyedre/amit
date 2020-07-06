@@ -10,14 +10,13 @@ from .database import (
     Group,
     Note,
     Service,
-    ServiceInfo,
     add_user,
     add_group,
     add_machine,
     add_domain,
     add_service,
-    add_serviceinfo,
 )
+from .config import LDAP_UNINTERESTING_FIELDS, LDAP_POTENTIAL_USERNAME_FIELDS
 from bs4 import BeautifulSoup
 import subprocess
 import logging
@@ -35,8 +34,28 @@ def service_scan(id, session):
 
     # Run scans
     ldap_scan(service, session)
+    smb_scan(service, session)
     j.status = "DONE"
     s.commit()
+
+
+def smb_scan(service, session):
+    if service.port == 445:
+        nmap(service.machine, session, options=f"--script smb-vuln* -p {service.port}")
+
+        commands_and_parsers = {
+            "enumdomains": print,
+            "enumdomusers": print,
+            "enumdomgroups": print,
+            "enumalsgroups domain": print,
+            "enumalsgroups builtin": print,
+        }
+
+        command = "\nthisisnotacommand\n".join(commands_and_parsers)
+        res = execute(
+            f"echo '{command}' | rpcclient -U '' -N {service.machine.ip}", shell=True,
+        ).strip()
+        service.notes.append(Note(title="rpcclient_scan", content=res, interest=2))
 
 
 def ldap_scan(service, session):
@@ -48,12 +67,12 @@ def ldap_scan(service, session):
             f"ldapsearch -x -h {service.machine.ip} -p {service.port} -s base"
         )
 
-        ServiceInfo(
-            name="Detecting base ldap domain",
-            source="ldapsearch",
-            content=res,
-            confidence=100,
-            service=service,
+        service.notes.append(
+            Note(
+                title="Detecting base ldap domain (ldapsearch)",
+                content=res,
+                interest=3,
+            )
         )
 
         if "ldap_sasl_bind" not in res:
@@ -70,12 +89,12 @@ def ldap_scan(service, session):
                     f"ldapsearch -x -h {service.machine.ip} -p {service.port} -b {base_dn}"
                 )
 
-                ServiceInfo(
-                    name="Searching the whole ldap domain",
-                    source="ldapsearch",
-                    content=res,
-                    confidence=100,
-                    service=service,
+                service.notes.append(
+                    Note(
+                        title="Searching the whole ldap domain (ldapsearch)",
+                        content=res,
+                        interest=3,
+                    )
                 )
 
                 ldap_parse_users_and_groups(res, service, session)
@@ -105,32 +124,67 @@ def ldap_is_group(dn):
 def ldap_parse_user(dn, service, session):
     name = None
     notes = [Note(title="Ldap Dump", content=dn, interest=2)]
+
+    interesting_fields = ""
+    potential_usernames = ""
+
     for line in dn.split("\n"):
-        if line.startswith("cn: "):
-            name = line.split(": ")[1]
-        if (
-            line.startswith("displayName")
-            or line.startswith("sAMAccountName: ")
-            or line.startswith("userPrincipalName: ")
-        ):
-            notes.append(Note(title="Potential username", content=line, interest=1))
+        if line and not line[0] == "#":
+            field = line.split(":")[0]
+            if field == "cn":
+                name = line.split(": ")[1]
+            elif field in LDAP_POTENTIAL_USERNAME_FIELDS:
+                potential_usernames += line + "\n"
+            elif field not in LDAP_UNINTERESTING_FIELDS:
+                interesting_fields += line + "\n"
+
+    if interesting_fields:
+        notes.append(
+            Note(
+                title="Interesting fields (ldapsearch)",
+                content=interesting_fields.strip(),
+                interest=1,
+            )
+        )
+    if potential_usernames:
+        notes.append(
+            Note(
+                title="Potential usernames (ldapsearch)",
+                content=potential_usernames.strip(),
+                interest=1,
+            )
+        )
+
     add_user(session, name, service, notes=notes)
 
 
 def ldap_parse_group(dn, service, session):
     name = None
     users = []
+    notes = [Note(title="Ldap Dump", content=dn, interest=2)]
+
+    interesting_fields = ""
+
     for line in dn.split("\n"):
-        if (
-            line.startswith("cn: ")
-            or line.startswith("displayName: ")
-            or line.startswith("name: ")
-        ):
-            name = line.split(": ")[1]
-        if line.startswith("member: "):
-            u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
-            users.append(u)
-    add_group(session, name, service, users)
+        if line and not line[0] == "#":
+            field = line.split(":")[0]
+            if field == "cn":
+                name = line.split(": ")[1]
+            elif field == "member":
+                u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
+                users.append(u)
+            elif field not in LDAP_UNINTERESTING_FIELDS:
+                interesting_fields += line + "\n"
+
+    if interesting_fields:
+        notes.append(
+            Note(
+                title="Interesting fields (ldapsearch)",
+                content=interesting_fields.strip(),
+                interest=1,
+            )
+        )
+    add_group(session, name, service, users, notes=notes)
 
 
 def ldap_address_get_first(address):
@@ -186,13 +240,12 @@ def nmap(machine, session, options=""):
                         status=xml_state.get("state"),
                     )
                     for script in port.findAll("script"):
-                        add_serviceinfo(
-                            session,
-                            script.get("id"),
-                            script.get("output").strip(),
-                            service=s,
-                            source="nmap",
-                            confidence=90,
+                        s.notes.append(
+                            Note(
+                                title=script.get("id") + " (nmap)",
+                                content=script.get("output").strip(),
+                                interest="2",
+                            )
                         )
     session.commit()
     return ports
@@ -312,8 +365,11 @@ def analyse_target(target, session):
     return m
 
 
-def execute(command):
-    return subprocess.check_output(command.split(" ")).decode()
+def execute(command, shell=False):
+    if shell:
+        return subprocess.check_output(command, shell=shell).decode()
+    else:
+        return subprocess.check_output(command.split(" ")).decode()
 
 
 def is_ip(target):

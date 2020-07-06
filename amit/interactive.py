@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import cmd
-from .database import Service, Machine, Domain, Job
-from .constants import GREEN, RED, FAINTED, RESET
+from .database import Job
 from .interactive_show import interactive_show
 from .interactive_scan import interactive_scan
 from .interactive_enum import interactive_enum
 from .interactive_add import interactive_add
+from .interactive_report import interactive_report
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +33,15 @@ class AmitShell(cmd.Cmd):
         s = self.session()
         try:
             interactive_show(arg, s)
+        except Exception as e:
+            print(e)
+        s.close()
+
+    def do_report(self, arg):
+        """Build reports about informations present in database"""
+        s = self.session()
+        try:
+            interactive_report(arg, s)
         except Exception as e:
             print(e)
         s.close()

@@ -130,6 +130,7 @@ def show_groups(arguments, session):
                 group.id, group.name, ", ".join([g.name for g in group.users])
             )
         )
+        show_notes(group.notes, arguments["-v"])
 
 
 def show_services(arguments, session):
@@ -153,16 +154,7 @@ def show_services(arguments, session):
                 service.version or "",
             )
         )
-        if arguments["-v"] > 1:
-            for service_info in service.info:
-                print(
-                    "{}\t{}\n\t\t{}{}".format(
-                        FAINTED,
-                        service_info.name,
-                        service_info.content.replace("\n", "\n\t\t"),
-                        RESET,
-                    )
-                )
+        show_notes(service.notes, arguments["-v"])
 
 
 def show_domains(arguments, session):
@@ -184,7 +176,7 @@ def show_notes(notes, verbosity):
     for note in notes:
         if note.interest <= verbosity:
             print(
-                "    {}{}\n      {}{}".format(
-                    FAINTED, note.title, note.content.replace("\n", "\n      "), RESET
+                "\t{}{}\n\t\t{}{}".format(
+                    FAINTED, note.title, note.content.replace("\n", "\n\t\t"), RESET
                 )
             )
