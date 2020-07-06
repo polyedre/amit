@@ -43,20 +43,6 @@ def smb_scan(service, session):
     if service.port == 445:
         nmap(service.machine, session, options=f"--script smb-vuln* -p {service.port}")
 
-        commands_and_parsers = {
-            "enumdomains": print,
-            "enumdomusers": print,
-            "enumdomgroups": print,
-            "enumalsgroups domain": print,
-            "enumalsgroups builtin": print,
-        }
-
-        command = "\nthisisnotacommand\n".join(commands_and_parsers)
-        res = execute(
-            f"echo '{command}' | rpcclient -U '' -N {service.machine.ip}", shell=True,
-        ).strip()
-        service.notes.append(Note(title="rpcclient_scan", content=res, interest=2))
-
 
 def ldap_scan(service, session):
 
@@ -162,28 +148,16 @@ def ldap_parse_group(dn, service, session):
     name = None
     users = []
     notes = [Note(title="Ldap Dump", content=dn, interest=2)]
-
-    interesting_fields = ""
-
     for line in dn.split("\n"):
-        if line and not line[0] == "#":
-            field = line.split(":")[0]
-            if field == "cn":
-                name = line.split(": ")[1]
-            elif field == "member":
-                u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
-                users.append(u)
-            elif field not in LDAP_UNINTERESTING_FIELDS:
-                interesting_fields += line + "\n"
-
-    if interesting_fields:
-        notes.append(
-            Note(
-                title="Interesting fields (ldapsearch)",
-                content=interesting_fields.strip(),
-                interest=1,
-            )
-        )
+        if (
+            line.startswith("cn: ")
+            or line.startswith("displayName: ")
+            or line.startswith("name: ")
+        ):
+            name = line.split(": ")[1]
+        if line.startswith("member: "):
+            u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
+            users.append(u)
     add_group(session, name, service, users, notes=notes)
 
 
