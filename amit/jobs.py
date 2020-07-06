@@ -18,6 +18,7 @@ from .database import (
     add_service,
     add_serviceinfo,
 )
+from .config import LDAP_UNINTERESTING_FIELDS, LDAP_POTENTIAL_USERNAME_FIELDS
 from bs4 import BeautifulSoup
 import subprocess
 import logging
@@ -111,15 +112,37 @@ def ldap_is_group(dn):
 def ldap_parse_user(dn, service, session):
     name = None
     notes = [Note(title="Ldap Dump", content=dn, interest=2)]
+
+    interesting_fields = ""
+    potential_usernames = ""
+
     for line in dn.split("\n"):
-        if line.startswith("cn: "):
-            name = line.split(": ")[1]
-        if (
-            line.startswith("displayName")
-            or line.startswith("sAMAccountName: ")
-            or line.startswith("userPrincipalName: ")
-        ):
-            notes.append(Note(title="Potential username", content=line, interest=1))
+        if line and not line[0] == "#":
+            field = line.split(":")[0]
+            if field == "cn":
+                name = line.split(": ")[1]
+            elif field in LDAP_POTENTIAL_USERNAME_FIELDS:
+                potential_usernames += line + "\n"
+            elif field not in LDAP_UNINTERESTING_FIELDS:
+                interesting_fields += line + "\n"
+
+    if interesting_fields:
+        notes.append(
+            Note(
+                title="Interesting fields (ldapsearch)",
+                content=interesting_fields.strip(),
+                interest=1,
+            )
+        )
+    if potential_usernames:
+        notes.append(
+            Note(
+                title="Potential usernames (ldapsearch)",
+                content=potential_usernames.strip(),
+                interest=1,
+            )
+        )
+
     add_user(session, name, service, notes=notes)
 
 
@@ -127,16 +150,28 @@ def ldap_parse_group(dn, service, session):
     name = None
     users = []
     notes = [Note(title="Ldap Dump", content=dn, interest=2)]
+
+    interesting_fields = ""
+
     for line in dn.split("\n"):
-        if (
-            line.startswith("cn: ")
-            or line.startswith("displayName: ")
-            or line.startswith("name: ")
-        ):
-            name = line.split(": ")[1]
-        if line.startswith("member: "):
-            u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
-            users.append(u)
+        if line and not line[0] == "#":
+            field = line.split(":")[0]
+            if field == "cn":
+                name = line.split(": ")[1]
+            elif field == "member":
+                u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
+                users.append(u)
+            elif field not in LDAP_UNINTERESTING_FIELDS:
+                interesting_fields += line + "\n"
+
+    if interesting_fields:
+        notes.append(
+            Note(
+                title="Interesting fields (ldapsearch)",
+                content=interesting_fields.strip(),
+                interest=1,
+            )
+        )
     add_group(session, name, service, users, notes=notes)
 
 

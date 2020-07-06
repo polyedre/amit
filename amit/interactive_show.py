@@ -185,7 +185,7 @@ def show_notes(notes, verbosity):
     for note in notes:
         if note.interest <= verbosity:
             print(
-                "    {}{}\n      {}{}".format(
-                    FAINTED, note.title, note.content.replace("\n", "\n      "), RESET
+                "\t{}{}\n\t\t{}{}".format(
+                    FAINTED, note.title, note.content.replace("\n", "\n\t\t"), RESET
                 )
             )

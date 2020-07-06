@@ -225,8 +225,14 @@ def add_user(session, name, service=None, notes=[]):
         u.name = name
         if service:
             u.service = service
-        for note in notes:
-            u.notes.append(note)
+
+        if u.notes:
+            titles = [n.title for n in u.notes]
+            for n in notes:
+                if n.title not in titles:
+                    u.notes.append(n)
+        else:
+            u.notes = notes
     else:
         u = User(name=name, service=service, notes=notes)
         session.add(u)
@@ -250,6 +256,7 @@ def add_group(session, name, service=None, users=[], notes=[]):
         g = session.query(Group).filter(Group.name == name).first()
     if g:
         g.name = name
+
         if g.users:
             ids = [u.id for u in g.users]
             for u in users:
@@ -257,6 +264,15 @@ def add_group(session, name, service=None, users=[], notes=[]):
                     g.users.append(u)
         else:
             g.users = users
+
+        if g.notes:
+            titles = [n.title for n in g.notes]
+            for n in notes:
+                if n.title not in titles:
+                    g.notes.append(n)
+        else:
+            g.notes = notes
+
         for note in notes:
             g.notes.append(note)
     else:
