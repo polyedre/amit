@@ -57,6 +57,7 @@ def smb_scan(service, session):
         ).strip()
         service.notes.append(Note(title="rpcclient_scan", content=res, interest=2))
 
+
 def ldap_scan(service, session):
 
     if service.name == "ldap":
