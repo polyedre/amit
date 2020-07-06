@@ -43,6 +43,19 @@ def smb_scan(service, session):
     if service.port == 445:
         nmap(service.machine, session, options=f"--script smb-vuln* -p {service.port}")
 
+        commands_and_parsers = {
+            "enumdomains": print,
+            "enumdomusers": print,
+            "enumdomgroups": print,
+            "enumalsgroups domain": print,
+            "enumalsgroups builtin": print,
+        }
+
+        command = "\nthisisnotacommand\n".join(commands_and_parsers)
+        res = execute(
+            f"echo '{command}' | rpcclient -U '' -N {service.machine.ip}", shell=True,
+        ).strip()
+        service.notes.append(Note(title="rpcclient_scan", content=res, interest=2))
 
 def ldap_scan(service, session):
 
