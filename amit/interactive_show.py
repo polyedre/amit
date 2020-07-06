@@ -130,6 +130,7 @@ def show_groups(arguments, session):
                 group.id, group.name, ", ".join([g.name for g in group.users])
             )
         )
+        show_notes(group.notes, arguments["-v"])
 
 
 def show_services(arguments, session):

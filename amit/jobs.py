@@ -35,8 +35,14 @@ def service_scan(id, session):
 
     # Run scans
     ldap_scan(service, session)
+    smb_scan(service, session)
     j.status = "DONE"
     s.commit()
+
+
+def smb_scan(service, session):
+    if service.port == 445:
+        nmap(service.machine, session, options=f"--script smb-vuln* -p {service.port}")
 
 
 def ldap_scan(service, session):
@@ -120,6 +126,7 @@ def ldap_parse_user(dn, service, session):
 def ldap_parse_group(dn, service, session):
     name = None
     users = []
+    notes = [Note(title="Ldap Dump", content=dn, interest=2)]
     for line in dn.split("\n"):
         if (
             line.startswith("cn: ")
@@ -130,7 +137,7 @@ def ldap_parse_group(dn, service, session):
         if line.startswith("member: "):
             u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
             users.append(u)
-    add_group(session, name, service, users)
+    add_group(session, name, service, users, notes=notes)
 
 
 def ldap_address_get_first(address):
