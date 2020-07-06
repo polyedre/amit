@@ -154,16 +154,7 @@ def show_services(arguments, session):
                 service.version or "",
             )
         )
-        if arguments["-v"] > 1:
-            for service_info in service.info:
-                print(
-                    "{}\t{}\n\t\t{}{}".format(
-                        FAINTED,
-                        service_info.name,
-                        service_info.content.replace("\n", "\n\t\t"),
-                        RESET,
-                    )
-                )
+        show_notes(service.notes, arguments["-v"])
 
 
 def show_domains(arguments, session):

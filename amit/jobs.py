@@ -10,13 +10,11 @@ from .database import (
     Group,
     Note,
     Service,
-    ServiceInfo,
     add_user,
     add_group,
     add_machine,
     add_domain,
     add_service,
-    add_serviceinfo,
 )
 from .config import LDAP_UNINTERESTING_FIELDS, LDAP_POTENTIAL_USERNAME_FIELDS
 from bs4 import BeautifulSoup
@@ -59,6 +57,7 @@ def smb_scan(service, session):
         ).strip()
         service.notes.append(Note(title="rpcclient_scan", content=res, interest=2))
 
+
 def ldap_scan(service, session):
 
     if service.name == "ldap":
@@ -68,12 +67,12 @@ def ldap_scan(service, session):
             f"ldapsearch -x -h {service.machine.ip} -p {service.port} -s base"
         )
 
-        ServiceInfo(
-            name="Detecting base ldap domain",
-            source="ldapsearch",
-            content=res,
-            confidence=100,
-            service=service,
+        service.notes.append(
+            Note(
+                title="Detecting base ldap domain (ldapsearch)",
+                content=res,
+                interest=3,
+            )
         )
 
         if "ldap_sasl_bind" not in res:
@@ -90,12 +89,12 @@ def ldap_scan(service, session):
                     f"ldapsearch -x -h {service.machine.ip} -p {service.port} -b {base_dn}"
                 )
 
-                ServiceInfo(
-                    name="Searching the whole ldap domain",
-                    source="ldapsearch",
-                    content=res,
-                    confidence=100,
-                    service=service,
+                service.notes.append(
+                    Note(
+                        title="Searching the whole ldap domain (ldapsearch)",
+                        content=res,
+                        interest=3,
+                    )
                 )
 
                 ldap_parse_users_and_groups(res, service, session)
@@ -241,13 +240,12 @@ def nmap(machine, session, options=""):
                         status=xml_state.get("state"),
                     )
                     for script in port.findAll("script"):
-                        add_serviceinfo(
-                            session,
-                            script.get("id"),
-                            script.get("output").strip(),
-                            service=s,
-                            source="nmap",
-                            confidence=90,
+                        s.notes.append(
+                            Note(
+                                title=script.get("id") + " (nmap)",
+                                content=script.get("output").strip(),
+                                interest="2",
+                            )
                         )
     session.commit()
     return ports
