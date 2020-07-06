@@ -148,16 +148,28 @@ def ldap_parse_group(dn, service, session):
     name = None
     users = []
     notes = [Note(title="Ldap Dump", content=dn, interest=2)]
+
+    interesting_fields = ""
+
     for line in dn.split("\n"):
-        if (
-            line.startswith("cn: ")
-            or line.startswith("displayName: ")
-            or line.startswith("name: ")
-        ):
-            name = line.split(": ")[1]
-        if line.startswith("member: "):
-            u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
-            users.append(u)
+        if line and not line[0] == "#":
+            field = line.split(":")[0]
+            if field == "cn":
+                name = line.split(": ")[1]
+            elif field == "member":
+                u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
+                users.append(u)
+            elif field not in LDAP_UNINTERESTING_FIELDS:
+                interesting_fields += line + "\n"
+
+    if interesting_fields:
+        notes.append(
+            Note(
+                title="Interesting fields (ldapsearch)",
+                content=interesting_fields.strip(),
+                interest=1,
+            )
+        )
     add_group(session, name, service, users, notes=notes)
 
 
