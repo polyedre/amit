@@ -51,26 +51,13 @@ class Service(Base):
     machine_id = Column(Integer, ForeignKey("machine.id"))
     machine = relationship("Machine", backref=backref("services", uselist=True))
     status = Column(String)
+    notes = relationship("Note", secondary="service_note_link")
 
     def oneline(self):
         return f"{self.port:5d} {self.name:15.15s} {self.product if self.product else 'None':15.15s} {self.version if self.version else 'None'}"
 
     def __repr__(self):
         return f"Service(port={self.port}, name={self.name}, product={self.product}) on {self.machine.ip}"
-
-
-class ServiceInfo(Base):
-    __tablename__ = "service_info"
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
-    content = Column(String)
-    source = Column(String)
-    confidence = Column(Integer)
-    service_id = Column(Integer, ForeignKey("service.id"))
-    service = relationship("Service", backref=backref("info", uselist=True))
-
-    def desc(self):
-        return f"{self.name} (from source: {self.source})\n{self.content}"
 
 
 class User(Base):
@@ -146,6 +133,12 @@ class GroupNoteLink(Base):
     note_id = Column(Integer, ForeignKey("note.id"), primary_key=True)
 
 
+class ServiceNoteLink(Base):
+    __tablename__ = "service_note_link"
+    service_id = Column(Integer, ForeignKey("service.id"), primary_key=True)
+    note_id = Column(Integer, ForeignKey("note.id"), primary_key=True)
+
+
 def add_machine(session, ip, domains=[]):
     m = session.query(Machine).filter(Machine.ip == ip).first()
     if m:
@@ -198,18 +191,6 @@ def add_service(session, port, name, machine, product=None, version=None, status
     return s
 
 
-def add_serviceinfo(session, name, content, service, source="Unknown", confidence=100):
-    s = ServiceInfo(
-        name=name,
-        content=content,
-        source=source,
-        confidence=confidence,
-        service=service,
-    )
-    session.add(s)
-    return s
-
-
 def add_user(session, name, service=None, notes=[]):
     if service:
         u = (
@@ -225,8 +206,14 @@ def add_user(session, name, service=None, notes=[]):
         u.name = name
         if service:
             u.service = service
-        for note in notes:
-            u.notes.append(note)
+
+        if u.notes:
+            titles = [n.title for n in u.notes]
+            for n in notes:
+                if n.title not in titles:
+                    u.notes.append(n)
+        else:
+            u.notes = notes
     else:
         u = User(name=name, service=service, notes=notes)
         session.add(u)
@@ -250,6 +237,7 @@ def add_group(session, name, service=None, users=[], notes=[]):
         g = session.query(Group).filter(Group.name == name).first()
     if g:
         g.name = name
+
         if g.users:
             ids = [u.id for u in g.users]
             for u in users:
@@ -257,6 +245,15 @@ def add_group(session, name, service=None, users=[], notes=[]):
                     g.users.append(u)
         else:
             g.users = users
+
+        if g.notes:
+            titles = [n.title for n in g.notes]
+            for n in notes:
+                if n.title not in titles:
+                    g.notes.append(n)
+        else:
+            g.notes = notes
+
         for note in notes:
             g.notes.append(note)
     else:

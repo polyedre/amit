@@ -5,12 +5,10 @@ from amit.database import (
     add_machine,
     add_domain,
     add_service,
-    add_serviceinfo,
     Machine,
     Service,
     Domain,
     Job,
-    ServiceInfo,
 )
 from amit.database import Base
 from sqlalchemy import create_engine, and_
@@ -34,7 +32,6 @@ class TestManager(TestCase):
         self.s.query(Service).all()
         self.s.query(Domain).all()
         self.s.query(Job).all()
-        self.s.query(ServiceInfo).all()
 
     def test_add_domain(self):
         """Domain can be added properly."""
