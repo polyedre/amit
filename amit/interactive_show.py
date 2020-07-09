@@ -62,7 +62,7 @@ def show_default(arguments, session):
             print("     - SERVICES:")
             for service in services:
                 print(
-                    "\t{:4d} - {:<4d} {:18.18} {:18.18} {:18.18}".format(
+                    "\t{:4d} - {:<5d} {:18.18} {:18} {:18}".format(
                         service.id,
                         service.port or "",
                         service.name or "",
@@ -109,12 +109,32 @@ def show_users(arguments, session):
         users = session.query(User).all()
 
     for user in users:
-        print(
-            "{:4d} - {:20.20} ({})".format(
-                user.id, user.name, ", ".join([g.name for g in user.groups])
+        if arguments["-v"] == 0:
+            print(
+                "{:4d} - {:20.20} {}".format(
+                    user.id, user.name, ", ".join([g.name for g in user.groups])
+                )
             )
-        )
-        show_notes(user.notes, arguments["-v"])
+        else:
+            print("{:4d} - {:20.20}".format(user.id, user.name,))
+            if user.groups:
+                print(
+                    "\tgroups: \n\t\t{}".format(
+                        "\n\t\t".join([g.name for g in user.groups])
+                    )
+                )
+            if user.credentials:
+                print(
+                    "\tcreds: \n\t\t{}".format(
+                        "\n\t\t".join(
+                            [
+                                f"{c.username or ''} {c.password or ''}"
+                                for c in user.credentials
+                            ]
+                        )
+                    )
+                )
+            show_notes(user.notes, arguments["-v"])
 
 
 def show_groups(arguments, session):
@@ -145,7 +165,7 @@ def show_services(arguments, session):
 
     for service in services.all():
         print(
-            "{:4d} - {:15} {:<4d} {:18.18} {:18.18} {:18.18}".format(
+            "{:4d} - {:15} {:<5d} {:17.17} {:17} {:17}".format(
                 service.id,
                 service.machine.ip or "",
                 service.port or "",

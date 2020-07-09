@@ -9,6 +9,7 @@ from .database import (
     User,
     Group,
     Note,
+    Credential,
     Service,
     add_user,
     add_group,
@@ -21,8 +22,8 @@ from bs4 import BeautifulSoup
 import subprocess
 import logging
 
-# logging.basicConfig(level=logging.CRITICAL)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.CRITICAL)
+# logging.basicConfig(level=logging.DEBUG)
 
 
 def service_scan(id, session):
@@ -126,7 +127,7 @@ def ldap_parse_user(dn, service, session):
     notes = [Note(title="Ldap Dump", content=dn, interest=2)]
 
     interesting_fields = ""
-    potential_usernames = ""
+    potential_usernames = []
 
     for line in dn.split("\n"):
         if line and not line[0] == "#":
@@ -134,7 +135,7 @@ def ldap_parse_user(dn, service, session):
             if field == "cn":
                 name = line.split(": ")[1]
             elif field in LDAP_POTENTIAL_USERNAME_FIELDS:
-                potential_usernames += line + "\n"
+                potential_usernames.append(Credential(username=line.split(": ")[1]))
             elif field not in LDAP_UNINTERESTING_FIELDS:
                 interesting_fields += line + "\n"
 
@@ -146,16 +147,9 @@ def ldap_parse_user(dn, service, session):
                 interest=1,
             )
         )
-    if potential_usernames:
-        notes.append(
-            Note(
-                title="Potential usernames (ldapsearch)",
-                content=potential_usernames.strip(),
-                interest=1,
-            )
-        )
-
-    add_user(session, name, service, notes=notes)
+    u = add_user(
+        session, name, service.machine, notes=notes, credentials=potential_usernames
+    )
 
 
 def ldap_parse_group(dn, service, session):
@@ -171,7 +165,11 @@ def ldap_parse_group(dn, service, session):
             if field == "cn":
                 name = line.split(": ")[1]
             elif field == "member":
-                u = add_user(session, name=ldap_address_get_first(line.split(": ")[1]))
+                u = add_user(
+                    session,
+                    machine=service.machine,
+                    name=ldap_address_get_first(line.split(": ")[1]),
+                )
                 users.append(u)
             elif field not in LDAP_UNINTERESTING_FIELDS:
                 interesting_fields += line + "\n"
@@ -184,7 +182,7 @@ def ldap_parse_group(dn, service, session):
                 interest=1,
             )
         )
-    add_group(session, name, service, users, notes=notes)
+    add_group(session, name, service.machine, users, notes=notes)
 
 
 def ldap_address_get_first(address):
@@ -230,16 +228,26 @@ def nmap(machine, session, options=""):
                     xml_service = port.service
                     xml_state = port.state
                     ports.append(port.get("portid"))
+
+                    product = xml_service.get("product")
+                    if product:
+                        product = product.strip()
+
+                    version = xml_service.get("version")
+                    if version:
+                        version = version.strip()
+
                     s = add_service(
                         session,
                         port=port.get("portid"),
                         name=xml_service.get("name"),
                         machine=m,
-                        product=xml_service.get("product"),
-                        version=xml_service.get("version"),
+                        product=product,
+                        version=version,
                         status=xml_state.get("state"),
                     )
                     for script in port.findAll("script"):
+                        print("ADDING SCRIPT", script.get("id"))
                         s.notes.append(
                             Note(
                                 title=script.get("id") + " (nmap)",
