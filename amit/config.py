@@ -39,13 +39,13 @@ LDAP_UNINTERESTING_FIELDS = [
     "userAccountControl",
     "whenChanged",
     "whenCreated",
+    "cn",
+    "sn",
+    "givenName",
+    "name",
 ]
 
 LDAP_POTENTIAL_USERNAME_FIELDS = [
     "sAMAccountName",
-    "cn",
-    "sn",
     "userPrincipalName",
-    "givenName",
-    "name",
 ]

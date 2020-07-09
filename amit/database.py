@@ -2,9 +2,12 @@
 
 from sqlalchemy import Column, String, Integer, ForeignKey, create_engine
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import case
 from sqlalchemy.orm import relationship, backref, sessionmaker
 
 Base = declarative_base()
+
+# Objects
 
 
 class Job(Base):
@@ -20,6 +23,19 @@ class Machine(Base):
     ip = Column(String, unique=True)
     domains = relationship("Domain", secondary="domain_machine_link")
 
+    def _merge(self, machine):
+        if machine:
+            self.merge(machine.domains)
+
+    def merge(self, domains):
+        for domain in domains:
+            if domain in self.domains:
+                self_domain = self.domains[self.domains.index(domain)]
+                if self_domain != domain:
+                    self_domain._merge(domain)
+            else:
+                self.domains.append(domain)
+
     def __repr__(self):
         return f"{self.ip}"
 
@@ -31,14 +47,26 @@ class Domain(Base):
     machines = relationship("Machine", secondary="domain_machine_link")
     notes = relationship("Note", secondary="domain_note_link")
 
+    def _merge(self, domain):
+        self.merge(domain.machines, domain.notes)
+
+    def merge(self, machines, notes):
+
+        for machine in machines:
+            if machine in self.machines:
+                self_machine = self.machines[self.machines.index(machine)]
+                if self_machine != machine:
+                    self_machine._merge(machine)
+            else:
+                self.machines.append(machine)
+
+        titles = [n.title for n in self.notes]
+        for n in notes:
+            if n.title not in titles:
+                self.notes.append(n)
+
     def __repr__(self):
         return f"{self.name}"
-
-
-class DomainMachineLink(Base):
-    __tablename__ = "domain_machine_link"
-    domain_id = Column(Integer, ForeignKey("machine.id"), primary_key=True)
-    machine_id = Column(Integer, ForeignKey("domain.id"), primary_key=True)
 
 
 class Service(Base):
@@ -53,6 +81,43 @@ class Service(Base):
     status = Column(String)
     notes = relationship("Note", secondary="service_note_link")
 
+    __mapper_args__ = {
+        "polymorphic_on": case([(name == "http", "http")], else_="service"),
+        "polymorphic_identity": "service",
+    }
+
+    def _merge(self, service):
+        self.merge(
+            service.name,
+            service.product,
+            service.version,
+            service.status,
+            service.notes,
+        )
+
+    def merge(self, name, product, version, status, notes):
+
+        # Choose to take last
+        if name:
+            self.name = name
+
+        if product:
+            self.product = product
+
+        if version:
+            self.version = version
+
+        if status:
+            self.status = status
+
+        titles = [n.title for n in self.notes]
+        for n in notes:
+            if n.title not in titles:
+                print(f"note {n.title} not in {titles}")
+                self.notes.append(n)
+            else:
+                print(f"note {n.title} in {titles}")
+
     def oneline(self):
         return f"{self.port:5d} {self.name:15.15s} {self.product if self.product else 'None':15.15s} {self.version if self.version else 'None'}"
 
@@ -60,42 +125,75 @@ class Service(Base):
         return f"Service(port={self.port}, name={self.name}, product={self.product}) on {self.machine.ip}"
 
 
+class HTTPService(Service):
+    url = Column(String)
+
+    __mapper_args__ = {"polymorphic_identity": "http"}
+
+
 class User(Base):
     __tablename__ = "user"
     id = Column(Integer, primary_key=True)
     name = Column(String)
-
     groups = relationship("Group", secondary="user_group_link")
-
-    service_id = Column(Integer, ForeignKey("service.id"))
-    service = relationship("Service", backref=backref("users", uselist=True))
-
     notes = relationship("Note", secondary="user_note_link")
 
-    def __repr__(self):
-        text = f"User(name={self.name}"
-        if self.groups:
-            text += f", groups={[g.name for g in self.groups]}"
-        return text + ")"
+    machine_id = Column(Integer, ForeignKey("machine.id"))
+    machine = relationship("Machine", backref=backref("users", uselist=True))
+
+    def merge(self, machine, notes, credentials):
+        if not self.machine:
+            self.machine = machine
+        else:
+            self.machine._merge(machine)
+
+        # TODO: use note.merge
+        titles = [n.title for n in self.notes]
+        for n in notes:
+            if n.title not in titles:
+                self.notes.append(n)
+
+        for c in credentials:
+            if c in self.credentials:
+                self.credentials[self.credentials.index(c)]._merge(c)
+            else:
+                self.credentials.append(c)
 
 
 class Group(Base):
     __tablename__ = "group"
     id = Column(Integer, primary_key=True)
     name = Column(String)
-
     users = relationship("User", secondary="user_group_link")
-
-    service_id = Column(Integer, ForeignKey("service.id"))
-    service = relationship("Service", backref=backref("groups", uselist=True))
-
     notes = relationship("Note", secondary="group_note_link")
 
-    def __repr__(self):
-        text = f"Group(name={self.name}"
-        if self.users:
-            text += f", users={[u.name for u in self.users]}"
-        return text + ")"
+    machine_id = Column(Integer, ForeignKey("machine.id"))
+    machine = relationship("Machine", backref=backref("groups", uselist=True))
+
+    def _merge(self, group):
+        if group:
+            self.merge(group.machine, group.users, group.notes)
+
+    def merge(self, machine, users, notes):
+
+        if not self.machine:
+            self.machine = machine
+        else:
+            self.machine._merge(machine)
+
+        for user in users:
+            if user in self.users:
+                self_user = self.users[self.users.index(user)]
+                if self_user != user:
+                    self_user._merge(user)
+            else:
+                self.users.append(user)
+
+        # TODO: use note.merge
+        titles = [n.title for n in self.notes]
+        for n in notes:
+            if n.title not in titles:
+                self.notes.append(n)
 
 
 class Note(Base):
@@ -107,6 +205,64 @@ class Note(Base):
 
     def __repr__(self):
         return self.content
+
+
+class Credential(Base):
+    __tablename__ = "credential"
+    id = Column(Integer, primary_key=True)
+    username = Column(String)
+    password = Column(String)
+    confidence = Column(Integer)
+
+    user_id = Column(Integer, ForeignKey("user.id"))
+    user = relationship("User", backref=backref("credentials", uselist=True))
+
+    services = relationship("Service", secondary="service_credential_link")
+
+    def merge(self, confidence, user, services, username, password):
+        if self.confidence:
+            self.confidence = max(confidence, self.confidence)
+        else:
+            self.confidence = confidence
+
+        # TODO: add new credential if user does not match
+        if not self.user:
+            self.user = user
+
+        if not self.username:
+            self.username = username
+
+        if not self.password:
+            self.password = password
+
+        for service in services:
+            if service in self.services:
+                self.services[self.services.index(service)]._merge(service)
+            else:
+                self.services.append(service)
+
+    def _merge(self, credential):
+        return self.merge(
+            credential.confidence,
+            credential.user,
+            credential.services,
+            credential.username,
+            credential.password,
+        )
+
+    def __eq__(self, other):
+        return self.username == other.username and (
+            self.password == None or self.password == other.password
+        )
+
+
+# Links
+
+
+class DomainMachineLink(Base):
+    __tablename__ = "domain_machine_link"
+    domain_id = Column(Integer, ForeignKey("machine.id"), primary_key=True)
+    machine_id = Column(Integer, ForeignKey("domain.id"), primary_key=True)
 
 
 class UserGroupLink(Base):
@@ -139,31 +295,38 @@ class ServiceNoteLink(Base):
     note_id = Column(Integer, ForeignKey("note.id"), primary_key=True)
 
 
+class ServiceCredentialLink(Base):
+    __tablename__ = "service_credential_link"
+    service_id = Column(Integer, ForeignKey("service.id"), primary_key=True)
+    credential_id = Column(Integer, ForeignKey("credential.id"), primary_key=True)
+
+
+# API
+
+
 def add_machine(session, ip, domains=[]):
     m = session.query(Machine).filter(Machine.ip == ip).first()
     if m:
-        for d in domains:
-            if d not in m.domains:
-                m.domains.append(d)
+        m.merge(domains)
     else:
         m = Machine(ip=ip, domains=domains)
         session.add(m)
     return m
 
 
-def add_domain(session, name, machines=[]):
+def add_domain(session, name, machines=[], notes=[]):
     d = session.query(Domain).filter(Domain.name == name).first()
     if d:
-        for m in machines:
-            if m not in d.machines:
-                d.machines.append(m)
+        d.merge(machines, notes)
     else:
         d = Domain(name=name, machines=machines)
         session.add(d)
     return d
 
 
-def add_service(session, port, name, machine, product=None, version=None, status=None):
+def add_service(
+    session, port, name, machine, product=None, version=None, status=None, notes=[]
+):
     s = (
         session.query(Service)
         .join(Machine)
@@ -171,13 +334,7 @@ def add_service(session, port, name, machine, product=None, version=None, status
         .first()
     )
     if s:
-        s.name = name
-        if product:
-            s.product = product
-        if version:
-            s.version = version
-        if status:
-            s.status = status
+        s.merge(name, product, version, status, notes)
     else:
         s = Service(
             port=port,
@@ -191,73 +348,38 @@ def add_service(session, port, name, machine, product=None, version=None, status
     return s
 
 
-def add_user(session, name, service=None, notes=[]):
-    if service:
+def add_user(session, name, machine=None, notes=[], credentials=[]):
+    if machine:
         u = (
             session.query(User)
-            .join(Service)
             .join(Machine)
-            .filter(User.name == name, Machine.ip == service.machine.ip)
+            .filter(User.name == name, Machine.ip == machine.ip)
             .first()
         )
     else:
         u = session.query(User).filter(User.name == name).first()
     if u:
-        u.name = name
-        if service:
-            u.service = service
-
-        if u.notes:
-            titles = [n.title for n in u.notes]
-            for n in notes:
-                if n.title not in titles:
-                    u.notes.append(n)
-        else:
-            u.notes = notes
+        u.merge(machine, notes, credentials)
     else:
-        u = User(name=name, service=service, notes=notes)
+        u = User(name=name, machine=machine, notes=notes)
         session.add(u)
     return u
 
 
-def add_group(session, name, service=None, users=[], notes=[]):
-    if service:
+def add_group(session, name, machine=None, users=[], notes=[]):
+    if machine:
         g = (
             session.query(Group)
-            .join(Service)
             .join(Machine)
-            .filter(
-                Service.port == service.port,
-                Machine.ip == service.machine.ip,
-                Group.name == name,
-            )
+            .filter(Machine.ip == machine.ip, Group.name == name)
             .first()
         )
     else:
         g = session.query(Group).filter(Group.name == name).first()
     if g:
-        g.name = name
-
-        if g.users:
-            ids = [u.id for u in g.users]
-            for u in users:
-                if u.id not in ids:
-                    g.users.append(u)
-        else:
-            g.users = users
-
-        if g.notes:
-            titles = [n.title for n in g.notes]
-            for n in notes:
-                if n.title not in titles:
-                    g.notes.append(n)
-        else:
-            g.notes = notes
-
-        for note in notes:
-            g.notes.append(note)
+        g.merge(machine, users, notes)
     else:
-        g = Group(name=name, service=service, users=[], notes=notes)
+        g = Group(name=name, machine=machine, users=[], notes=notes)
         session.add(g)
     return g
 
