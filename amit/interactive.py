@@ -26,7 +26,7 @@ class AmitShell(cmd.Cmd):
         try:
             interactive_scan(arg, self.session)
         except Exception as e:
-            print(e)
+            print("ERROR: ", e)
 
     def do_show(self, arg):
         """Display informations about machines"""
@@ -90,9 +90,3 @@ class AmitShell(cmd.Cmd):
 def start_shell(session):
     amit_shell = AmitShell(session)
     amit_shell.cmdloop()
-
-
-def serialize(obj):
-    if isinstance(obj, set):
-        return list(obj)
-    return obj.__dict__
