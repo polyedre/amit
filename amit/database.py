@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship, backref, sessionmaker
 import logging
 
 Base = declarative_base()
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 # Objects
 
@@ -139,6 +139,7 @@ class User(Base):
     name = Column(String)
     groups = relationship("Group", secondary="user_group_link")
     notes = relationship("Note", secondary="user_note_link")
+    smb_rid = Column(String)
 
     machine_id = Column(Integer, ForeignKey("machine.id"))
     machine = relationship("Machine", backref=backref("users", uselist=True))
@@ -146,8 +147,8 @@ class User(Base):
     def _merge(self, user):
         self.merge(user.machine, user.notes, user.credentials)
 
-    def merge(self, machine, notes, credentials):
-        if not self.machine:
+    def merge(self, machine=None, notes=[], credentials=[], groups=[]):
+        if not self.machine and machine:
             self.machine = machine
         else:
             self.machine._merge(machine)
@@ -164,6 +165,14 @@ class User(Base):
             else:
                 self.credentials.append(c)
 
+        for group in groups:
+            if group in self.groups:
+                self_group = self.groups[self.groups.index(group)]
+                if self_group != group and self_group:
+                    self_group._merge(group)
+            else:
+                self.groups.append(group)
+
     def __eq__(self, other):
         return set([other.name] + [c.username for c in other.credentials]).intersection(
             [self.name] + [c.username for c in self.credentials]
@@ -179,6 +188,7 @@ class Group(Base):
     name = Column(String)
     users = relationship("User", secondary="user_group_link")
     notes = relationship("Note", secondary="group_note_link")
+    smb_rid = Column(String)
 
     machine_id = Column(Integer, ForeignKey("machine.id"))
     machine = relationship("Machine", backref=backref("groups", uselist=True))
@@ -187,7 +197,7 @@ class Group(Base):
         if group:
             self.merge(group.machine, group.users, group.notes)
 
-    def merge(self, machine, users, notes):
+    def merge(self, machine=None, users=[], notes=[]):
 
         if not self.machine:
             self.machine = machine
@@ -207,6 +217,12 @@ class Group(Base):
         for n in notes:
             if n.title not in titles:
                 self.notes.append(n)
+
+    def __repr__(self):
+        return f"Group({self.name}, users=[{', '.join([u.name for u in self.users])}])"
+
+    def __eq__(self, other):
+        return self.name == other.name
 
 
 class Note(Base):
@@ -382,21 +398,21 @@ def add_user(session, name, machine=None, notes=[], credentials=[]):
 
 
 def add_group(session, name, machine=None, users=[], notes=[]):
-    if machine:
-        g = (
-            session.query(Group)
-            .join(Machine)
-            .filter(Machine.ip == machine.ip, Group.name == name)
-            .first()
-        )
-    else:
-        g = session.query(Group).filter(Group.name == name).first()
-    if g:
-        g.merge(machine, users, notes)
-    else:
-        g = Group(name=name, machine=machine, users=[], notes=notes)
-        session.add(g)
-    return g
+    # Here we do not add notes or machine, else it is added in database
+    new_g = Group(name=name)
+    logging.debug("Adding group %s", new_g)
+    groups = session.query(Group).all()
+
+    for g in groups:
+        if new_g == g:
+            logging.debug("Group is the same as %s", g)
+            g.merge(machine, users, notes)
+            return g
+
+    logging.debug("Group not found in %s", groups)
+    new_g.merge(machine, users, notes)
+    session.add(new_g)
+    return new_g
 
 
 if __name__ == "__main__":
