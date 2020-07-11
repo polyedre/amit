@@ -49,3 +49,12 @@ LDAP_POTENTIAL_USERNAME_FIELDS = [
     "sAMAccountName",
     "userPrincipalName",
 ]
+
+
+SMB_SCAN_COMMANDS = {
+    "enumdomains",
+    "enumdomusers",
+    "enumdomgroups",
+    "enumalsgroups domain",
+    "enumalsgroups builtin",
+}
