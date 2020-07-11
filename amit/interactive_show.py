@@ -111,7 +111,7 @@ def show_users(arguments, session):
     for user in users:
         if arguments["-v"] == 0:
             print(
-                "{:4d} - {:20.20} {}".format(
+                "{:4d} - {:20.20} '{}'".format(
                     user.id, user.name, ", ".join([g.name for g in user.groups])
                 )
             )
@@ -128,7 +128,7 @@ def show_users(arguments, session):
                     "\tcreds: \n\t\t{}".format(
                         "\n\t\t".join(
                             [
-                                f"{c.username or ''} {c.password or ''}"
+                                f"'{c.username or ''}' {c.password or ''}"
                                 for c in user.credentials
                             ]
                         )
