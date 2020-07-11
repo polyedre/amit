@@ -17,7 +17,11 @@ from .database import (
     add_domain,
     add_service,
 )
-from .config import LDAP_UNINTERESTING_FIELDS, LDAP_POTENTIAL_USERNAME_FIELDS
+from .config import (
+    LDAP_UNINTERESTING_FIELDS,
+    LDAP_POTENTIAL_USERNAME_FIELDS,
+    SMB_SCAN_COMMANDS,
+)
 from bs4 import BeautifulSoup
 import subprocess
 import logging
@@ -44,19 +48,48 @@ def smb_scan(service, session):
     if service.port == 445:
         nmap(service.machine, session, options=f"--script smb-vuln* -p {service.port}")
 
-        commands_and_parsers = {
-            "enumdomains": print,
-            "enumdomusers": print,
-            "enumdomgroups": print,
-            "enumalsgroups domain": print,
-            "enumalsgroups builtin": print,
-        }
-
-        command = "\nthisisnotacommand\n".join(commands_and_parsers)
+        command = "\nthisisnotacommand\n".join(SMB_SCAN_COMMANDS)
         res = execute(
             f"echo '{command}' | rpcclient -U '' -N {service.machine.ip}", shell=True,
         ).strip()
         service.notes.append(Note(title="rpcclient_scan", content=res, interest=2))
+
+        smb_parse_commands(res, session, service)
+def smb_parse_commands(result, session, service):
+
+    analyzers = {
+        r"^group:\[(.*)\] rid:\[(\w+)\]": smb_parse_group,
+        r"^user:\[(.*)\] rid:\[(\w+)\]": smb_parse_user,
+    }
+
+    for line in result.split("\n"):
+        for regexp, parser in analyzers.items():
+            match = re.match(regexp, line)
+            if match:
+                parser(*match.groups(), session, service)
+                break
+        logging.warning("Line not matched: %s", line)
+
+
+def smb_parse_group(name, rid, session, service):
+    notes = []
+    res = execute(
+        f"echo 'querygroup {rid}' | rpcclient -U '' -N {service.machine.ip}",
+        shell=True,
+    ).strip()
+    if not "NT_STATUS_NO_SUCH_GROUP" in res:
+        notes.append(Note(title="detail scan (rpcclient)", content=res, interest=2))
+    g = add_group(session, name, service.machine, notes=notes)
+
+
+def smb_parse_user(name, rid, session, service):
+    notes = []
+    res = execute(
+        f"echo 'queryuser {rid}' | rpcclient -U '' -N {service.machine.ip}", shell=True,
+    ).strip()
+    if not "NT_STATUS_NO_SUCH_GROUP" in res:
+        notes.append(Note(title="detail scan (rpcclient)", content=res, interest=2))
+    g = add_user(session, name, service.machine, notes=notes)
 
 
 def ldap_scan(service, session):
@@ -147,7 +180,7 @@ def ldap_parse_user(dn, service, session):
                 interest=1,
             )
         )
-    u = add_user(
+    add_user(
         session, name, service.machine, notes=notes, credentials=potential_usernames
     )
 
