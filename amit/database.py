@@ -4,8 +4,10 @@ from sqlalchemy import Column, String, Integer, ForeignKey, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import case
 from sqlalchemy.orm import relationship, backref, sessionmaker
+import logging
 
 Base = declarative_base()
+logging.basicConfig(level=logging.DEBUG)
 
 # Objects
 
@@ -141,6 +143,9 @@ class User(Base):
     machine_id = Column(Integer, ForeignKey("machine.id"))
     machine = relationship("Machine", backref=backref("users", uselist=True))
 
+    def _merge(self, user):
+        self.merge(user.machine, user.notes, user.credentials)
+
     def merge(self, machine, notes, credentials):
         if not self.machine:
             self.machine = machine
@@ -158,6 +163,14 @@ class User(Base):
                 self.credentials[self.credentials.index(c)]._merge(c)
             else:
                 self.credentials.append(c)
+
+    def __eq__(self, other):
+        return set([other.name] + [c.username for c in other.credentials]).intersection(
+            [self.name] + [c.username for c in self.credentials]
+        )
+
+    def __repr__(self):
+        return f"User({self.name}, groups: ({[g.name for g in self.groups]}), creds: ({[c.username for c in self.credentials]})"
 
 
 class Group(Base):
@@ -184,7 +197,7 @@ class Group(Base):
         for user in users:
             if user in self.users:
                 self_user = self.users[self.users.index(user)]
-                if self_user != user:
+                if self_user != user and self_user:
                     self_user._merge(user)
             else:
                 self.users.append(user)
@@ -349,21 +362,23 @@ def add_service(
 
 
 def add_user(session, name, machine=None, notes=[], credentials=[]):
-    if machine:
-        u = (
-            session.query(User)
-            .join(Machine)
-            .filter(User.name == name, Machine.ip == machine.ip)
-            .first()
-        )
-    else:
-        u = session.query(User).filter(User.name == name).first()
-    if u:
-        u.merge(machine, notes, credentials)
-    else:
-        u = User(name=name, machine=machine, notes=notes)
-        session.add(u)
-    return u
+    # Here we do not add notes or machine, else it is added in database
+    new_u = User(name=name)
+    logging.debug("Adding user %s", new_u)
+    users = session.query(User).all()
+
+    for u in users:
+        if set([u.name] + [c.username for c in u.credentials]).intersection(
+            [name] + [c.username for c in credentials]
+        ):
+            logging.debug("User is the same as %s", u)
+            u.merge(machine, notes, credentials)
+            return u
+
+    logging.debug("User not found in %s", users)
+    new_u.merge(machine, notes, credentials)
+    session.add(new_u)
+    return new_u
 
 
 def add_group(session, name, machine=None, users=[], notes=[]):
