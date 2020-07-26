@@ -14,4 +14,8 @@ def main():
     try:
         start_shell(session)
     except KeyboardInterrupt:
-        session().update(Job).values(status="DONE")
+        s = session()
+        jobs = s.query(Job).all()
+        for job in jobs:
+            job.status = "DONE"
+        s.commit()
