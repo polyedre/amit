@@ -148,10 +148,11 @@ class User(Base):
         self.merge(user.machine, user.notes, user.credentials)
 
     def merge(self, machine=None, notes=[], credentials=[], groups=[]):
-        if not self.machine and machine:
-            self.machine = machine
-        else:
-            self.machine._merge(machine)
+        if machine:
+            if not self.machine:
+                self.machine = machine
+            else:
+                self.machine._merge(machine)
 
         # TODO: use note.merge
         titles = [n.title for n in self.notes]
