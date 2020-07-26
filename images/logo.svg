@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg8"
+   inkscape:version="1.0 (4035a4fb49, 2020-05-01)"
+   sodipodi:docname="logo.svg">
+  <defs
+     id="defs2">
+    <inkscape:perspective
+       sodipodi:type="inkscape:persp3d"
+       inkscape:vp_x="0 : 148.5 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_z="210 : 148.5 : 1"
+       inkscape:persp3d-origin="105 : 99 : 1"
+       id="perspective833" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.2277933"
+     inkscape:cx="369.31281"
+     inkscape:cy="537.98708"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer1"
+     inkscape:document-rotation="0"
+     showgrid="false"
+     inkscape:window-width="1600"
+     inkscape:window-height="900"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1" />
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Calque 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="opacity:0.969719;fill:#23158f;stroke:#c82a2a;stroke-width:0;stroke-linecap:round;stroke-linejoin:round;paint-order:markers stroke fill;fill-opacity:1"
+       id="rect851"
+       width="128"
+       height="128"
+       x="37.011791"
+       y="84.372231"
+       ry="5.0580926" />
+    <path
+       id="rect853"
+       style="opacity:0.969719;fill:#7e42fb;stroke:#c82a2a;stroke-width:0;stroke-linecap:round;stroke-linejoin:round;paint-order:markers stroke fill;fill-opacity:1"
+       d="M 368.6582 355.48047 A 151.1811 151.1811 0 0 1 394.56641 440.11328 A 151.1811 151.1811 0 0 1 243.38672 591.29492 A 151.1811 151.1811 0 0 1 179.16602 576.97656 L 179.16602 746.95508 C 179.16602 757.54599 187.69227 766.07227 198.2832 766.07227 L 565.26953 766.07227 C 575.86049 766.07227 584.38672 757.54599 584.38672 746.95508 L 584.38672 374.59766 C 584.38672 364.00673 575.86049 355.48047 565.26953 355.48047 L 368.6582 355.48047 z "
+       transform="scale(0.26458333)" />
+    <text
+       xml:space="preserve"
+       style="font-size:17.6389px;line-height:1.25;font-family:modern_squared2;-inkscape-font-specification:'modern_squared2, Normal';letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+       x="62.393608"
+       y="111.14656"
+       id="text862"><tspan
+         sodipodi:role="line"
+         id="tspan860"
+         x="62.393608"
+         y="111.14656"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:50.8px;font-family:modern_squared2;-inkscape-font-specification:'modern_squared2, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583" /></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:70.5556px;line-height:1.25;font-family:modern_squared2;-inkscape-font-specification:'modern_squared2, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#7c41f8;fill-opacity:1;stroke-width:0.264583"
+       x="54.453331"
+       y="138.65454"
+       id="text866"><tspan
+         sodipodi:role="line"
+         id="tspan864"
+         x="54.453331"
+         y="138.65454"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:70.5556px;font-family:modern_squared2;-inkscape-font-specification:'modern_squared2, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#7c41f8;fill-opacity:1;stroke-width:0.264583">a</tspan></text>
+  </g>
+</svg>
