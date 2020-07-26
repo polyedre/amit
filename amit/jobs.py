@@ -47,7 +47,7 @@ def smb_scan(service, session):
     if service.port == 445:
         nmap(service.machine, session, options=f"--script smb-vuln* -p {service.port}")
 
-        command = "\nthisisnotacommand\n".join(SMB_SCAN_COMMANDS)
+        command = "\n".join(SMB_SCAN_COMMANDS)
         res = execute(
             f"echo '{command}' | rpcclient -U '' -N {service.machine.ip}", shell=True,
         ).strip()
