@@ -15,7 +15,7 @@ from sqlalchemy import create_engine, and_
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 
-class TestManager(TestCase):
+class TestDatabase(TestCase):
     def setUp(self):
         session = scoped_session(sessionmaker())
         engine = create_engine("sqlite:///tests/amit.sqlite")
