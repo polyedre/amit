@@ -53,8 +53,14 @@ def smb_scan(service, session):
         ).strip()
         service.notes.append(Note(title="rpcclient_scan", content=res, interest=2))
 
+        # 1 Run commands to enumerate users
         users_and_groups = smb_parse_commands(res, session, service)
+
+        # 2 Build links between groups and users
         smb_associate_groups_users(users_and_groups, session, service)
+
+        # 3 Scan deeply users and groups
+        smb_scan_users_and_groups(users_and_groups, session, service)
 
 
 def smb_associate_groups_users(users_and_groups, session, service):
@@ -85,6 +91,14 @@ def smb_associate_groups_users(users_and_groups, session, service):
                         rids.append(match.groups()[0])
                 groups = session.query(Group).filter(Group.smb_rid.in_(rids)).all()
                 u_or_g.merge(groups=groups)
+
+
+def smb_scan_users_and_groups(users_and_groups, session, service):
+    for u_or_g in users_and_groups:
+        if u_or_g.__class__ == Group:
+            smb_parse_group_info(u_or_g, session, service)
+        elif u_or_g.__class__ == User:
+            smb_parse_user_info(u_or_g, session, service)
 
 
 def smb_parse_commands(result, session, service):
@@ -129,24 +143,27 @@ def smb_parse_user(name, rid, session, service):
 def smb_parse_group_info(group, session, service):
     notes = []
     res = execute(
-        f"echo 'querygroup {rid}' | rpcclient -U '' -N {service.machine.ip}",
+        f"echo 'querygroup {group.smb_rid}' | rpcclient -U '' -N {service.machine.ip}",
         shell=True,
     ).strip()
     if "NT_STATUS_NO_SUCH_GROUP" not in res:
         notes.append(Note(title="detail scan (rpcclient)", content=res, interest=2))
-    logging.info("Adding group %s", name)
-    return add_group(session, name, service.machine, notes=notes)
+        for line in res.split("\n"):
+            key, value = [e.strip() for e in line.split(":")]
+            print("KEY:VALUE: {}:{}".format(key, value))
 
 
 def smb_parse_user_info(user, session, service):
     notes = []
     res = execute(
-        f"echo 'queryuser {rid}' | rpcclient -U '' -N {service.machine.ip}", shell=True,
+        f"echo 'queryuser {user.smb_rid}' | rpcclient -U '' -N {service.machine.ip}",
+        shell=True,
     ).strip()
     if "NT_STATUS_ACCESS_DENIED" not in res:
         notes.append(Note(title="detail scan (rpcclient)", content=res, interest=2))
-    logging.info("Adding group %s", name)
-    return add_user(session, name, service.machine, notes=notes)
+        for line in res.split("\n"):
+            key, value = [e.strip() for e in line.split(":")]
+            print("KEY:VALUE: {}:{}".format(key, value))
 
 
 def ldap_scan(service, session):
