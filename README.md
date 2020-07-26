@@ -6,7 +6,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/polyedre/amit">
-    <img src="images/logo.svg" alt="Logo" width="128" height="128">
+    <img src="images/logo.png" alt="Logo" width="128" height="128">
   </a>
 
   <h3 align="center">AMIT</h3>
