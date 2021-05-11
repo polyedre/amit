@@ -2,22 +2,15 @@
 [![GPL License][license-shield]][license-url]
 ![Python application](https://github.com/polyedre/amit/workflows/Python%20application/badge.svg)
 
-<!-- PROJECT LOGO -->
 <br />
 <p align="center">
   <a href="https://github.com/polyedre/amit">
     <img src="images/logo.png" alt="Logo" width="128" height="128">
   </a>
-
   <h3 align="center">AMIT</h3>
-
   <p align="center">
-    Centralise all your enumerations !
-    <!-- <br /> -->
-    <!-- <a href="https://github.com/polyedre/amit"><strong>Explore the docs »</strong></a> -->
-    <!-- <br /> -->
+    Centralise all your enumerations!
     <br />
-    <!-- <a href="https://github.com/polyedre/amit">View Demo</a> -->
     <a href="https://github.com/polyedre/amit/issues">Report Bug</a>
     ·
     <a href="https://github.com/polyedre/amit/issues">Request Feature</a>
@@ -116,8 +109,6 @@ For each command, you can view its usage using the `-h` flag.
 
 See the [open issues](https://github.com/polyedre/amit/issues) for a list of proposed features (and known issues).
 
-<!-- CONTRIBUTING -->
-
 ## Contributing
 
 Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
@@ -128,13 +119,9 @@ Contributions are what make the open source community such an amazing place to b
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-<!-- LICENSE -->
-
 ## License
 
 Distributed under the GPL-3.0 License. See `LICENSE` for more information.
-
-<!-- MARKDOWN LINKS & IMAGES -->
 
 [issues-shield]: https://img.shields.io/github/issues/polyedre/amit.svg
 [issues-url]: https://github.com/polyedre/amit/issue
